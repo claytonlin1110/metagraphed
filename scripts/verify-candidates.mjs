@@ -7,7 +7,7 @@ import {
   loadCandidates,
   repoRoot,
   stableStringify,
-  writeJson
+  writeJson,
 } from "./lib.mjs";
 
 const args = new Set(process.argv.slice(2));
@@ -28,21 +28,24 @@ const artifact = {
     by_classification: countBy(results, "classification"),
     by_kind: countBy(results, "kind"),
     by_provider: countBy(results, "provider"),
-    promotable_count: results.filter((result) => isPromotable(result)).length
+    promotable_count: results.filter((result) => isPromotable(result)).length,
   },
-  results
+  results,
 };
 
 if (!dryRun) {
-  await writeJson(path.join(repoRoot, "registry/verification/latest.json"), artifact);
+  await writeJson(
+    path.join(repoRoot, "registry/verification/latest.json"),
+    artifact,
+  );
 }
 
 console.log(
   stableStringify({
     mode: dryRun ? "dry-run" : "write",
     candidate_count: artifact.candidate_count,
-    summary: artifact.summary
-  })
+    summary: artifact.summary,
+  }),
 );
 
 async function verifyCandidate(candidate) {
@@ -57,7 +60,7 @@ async function verifyCandidate(candidate) {
     source_url: candidate.source_url,
     source_urls: candidate.source_urls || [candidate.source_url],
     url: candidate.url,
-    verified_at: new Date().toISOString()
+    verified_at: new Date().toISOString(),
   };
 
   if (!candidate.public_safe || isUnsafeUrl(candidate.url)) {
@@ -65,11 +68,12 @@ async function verifyCandidate(candidate) {
       ...base,
       classification: "unsafe",
       status: "failed",
-      error: "candidate is not public-safe"
+      error: "candidate is not public-safe",
     };
   }
 
-  const githubRepo = candidate.kind === "source-repo" ? parseGithubRepo(candidate.url) : null;
+  const githubRepo =
+    candidate.kind === "source-repo" ? parseGithubRepo(candidate.url) : null;
   if (githubRepo) {
     return verifyGithubRepo(base, githubRepo);
   }
@@ -99,29 +103,41 @@ async function verifyGithubRepo(base, repo) {
         has_default_branch: Boolean(metadata.default_branch),
         has_recent_push_metadata: Boolean(metadata.pushed_at),
         public_safe: true,
-        source_tier: base.source_tier || null
+        source_tier: base.source_tier || null,
       },
       status: metadata.archived ? "failed" : "ok",
-      topics: Array.isArray(metadata.topics) ? metadata.topics.slice().sort() : []
+      topics: Array.isArray(metadata.topics)
+        ? metadata.topics.slice().sort()
+        : [],
     };
   }
 
-  const fallback = await probeUrl(base.url, "HEAD", "text/html,application/xhtml+xml");
+  const fallback = await probeUrl(
+    base.url,
+    "HEAD",
+    "text/html,application/xhtml+xml",
+  );
   const classification = classifyHttpProbe(fallback);
   return {
     ...base,
     classification,
-    confidence_score: scoreCandidate({ ...base, kind: "source-repo", public_safe: true }, { ...fallback, classification }),
+    confidence_score: scoreCandidate(
+      { ...base, kind: "source-repo", public_safe: true },
+      { ...fallback, classification },
+    ),
     error: api.error || fallback.error || null,
     github_api_url: apiUrl,
     github_api_status: api.status_code || null,
     latency_ms: fallback.latency_ms,
     method_tested: fallback.method_tested,
     private_redirect_blocked: fallback.private_redirect_blocked || false,
-    quality_signals: qualitySignals({ ...base, kind: "source-repo", public_safe: true }, { ...fallback, classification }),
+    quality_signals: qualitySignals(
+      { ...base, kind: "source-repo", public_safe: true },
+      { ...fallback, classification },
+    ),
     redirect_target: fallback.redirect_target,
     status: fallback.ok ? "ok" : "failed",
-    status_code: fallback.status_code || null
+    status_code: fallback.status_code || null,
   };
 }
 
@@ -145,7 +161,7 @@ async function verifyHttpSurface(base, candidate) {
     status: probe.ok ? "ok" : "failed",
     status_code: probe.status_code || null,
     confidence_score: scoreCandidate(candidate, { ...probe, classification }),
-    quality_signals: qualitySignals(candidate, { ...probe, classification })
+    quality_signals: qualitySignals(candidate, { ...probe, classification }),
   };
 }
 
@@ -156,7 +172,7 @@ async function probeUrl(url, method, accept, redirectCount = 0) {
       error: "unsafe URL",
       latency_ms: 0,
       method_tested: method,
-      unsafe_url: true
+      unsafe_url: true,
     };
   }
 
@@ -168,14 +184,18 @@ async function probeUrl(url, method, accept, redirectCount = 0) {
       method,
       headers: {
         accept,
-        "user-agent": "metagraphed-candidate-verifier/0.0"
+        "user-agent": "metagraphed-candidate-verifier/0.0",
       },
       redirect: "manual",
-      signal: controller.signal
+      signal: controller.signal,
     });
     const latencyMs = Math.round(performance.now() - started);
     const location = response.headers.get("location");
-    if ([301, 302, 303, 307, 308].includes(response.status) && location && redirectCount < 5) {
+    if (
+      [301, 302, 303, 307, 308].includes(response.status) &&
+      location &&
+      redirectCount < 5
+    ) {
       const redirectTarget = new URL(location, url).toString();
       if (isUnsafeUrl(redirectTarget)) {
         await response.body?.cancel();
@@ -186,15 +206,20 @@ async function probeUrl(url, method, accept, redirectCount = 0) {
           method_tested: method,
           private_redirect_blocked: true,
           redirect_target: redirectTarget,
-          status_code: response.status
+          status_code: response.status,
         };
       }
       await response.body?.cancel();
-      const redirected = await probeUrl(redirectTarget, method, accept, redirectCount + 1);
+      const redirected = await probeUrl(
+        redirectTarget,
+        method,
+        accept,
+        redirectCount + 1,
+      );
       return {
         ...redirected,
         latency_ms: latencyMs + (redirected.latency_ms || 0),
-        redirect_target: redirected.redirect_target || redirectTarget
+        redirect_target: redirected.redirect_target || redirectTarget,
       };
     }
 
@@ -205,7 +230,7 @@ async function probeUrl(url, method, accept, redirectCount = 0) {
       latency_ms: latencyMs,
       method_tested: method,
       redirect_target: null,
-      status_code: response.status
+      status_code: response.status,
     };
   } catch (error) {
     return {
@@ -213,7 +238,7 @@ async function probeUrl(url, method, accept, redirectCount = 0) {
       error: error.message,
       error_class: error.name,
       latency_ms: Math.round(performance.now() - started),
-      method_tested: method
+      method_tested: method,
     };
   } finally {
     clearTimeout(timer);
@@ -228,20 +253,20 @@ async function fetchJson(url, headers = {}) {
       headers: {
         accept: "application/vnd.github+json",
         "user-agent": "metagraphed-candidate-verifier/0.0",
-        ...headers
+        ...headers,
       },
-      signal: controller.signal
+      signal: controller.signal,
     });
     const text = await response.text();
     return {
       ok: response.ok,
       body: text ? JSON.parse(text) : null,
-      status_code: response.status
+      status_code: response.status,
     };
   } catch (error) {
     return {
       ok: false,
-      error: error.message
+      error: error.message,
     };
   } finally {
     clearTimeout(timer);
@@ -255,7 +280,11 @@ function classifyHttpProbe(probe, candidate = null) {
   if (probe.error_class === "AbortError") {
     return "timeout";
   }
-  if (probe.redirect_target && probe.status_code >= 200 && probe.status_code < 400) {
+  if (
+    probe.redirect_target &&
+    probe.status_code >= 200 &&
+    probe.status_code < 400
+  ) {
     if (isContentMismatch(probe, candidate)) {
       return "content-mismatch";
     }
@@ -295,7 +324,9 @@ function isContentMismatch(probe, candidate) {
     return pathname.endsWith(".json") && !isJsonContentType(probe.content_type);
   }
   if (candidate.kind === "sse") {
-    return !String(probe.content_type || "").toLowerCase().includes("text/event-stream");
+    return !String(probe.content_type || "")
+      .toLowerCase()
+      .includes("text/event-stream");
   }
   return false;
 }
@@ -319,10 +350,16 @@ function scoreCandidate(candidate, probe) {
   } else if (candidate.confidence === "low") {
     score += 3;
   }
-  if (isJsonContentType(probe.content_type) && ["openapi", "subnet-api", "data-artifact"].includes(candidate.kind)) {
+  if (
+    isJsonContentType(probe.content_type) &&
+    ["openapi", "subnet-api", "data-artifact"].includes(candidate.kind)
+  ) {
     score += 10;
   }
-  if (isHtmlContentType(probe.content_type) && ["website", "docs", "dashboard"].includes(candidate.kind)) {
+  if (
+    isHtmlContentType(probe.content_type) &&
+    ["website", "docs", "dashboard"].includes(candidate.kind)
+  ) {
     score += 8;
   }
   if (probe.redirect_target) {
@@ -339,12 +376,15 @@ function scoreCandidate(candidate, probe) {
 
 function qualitySignals(candidate, probe) {
   return {
-    public_safe: candidate.public_safe === true && !probe.unsafe_url && !probe.private_redirect_blocked,
+    public_safe:
+      candidate.public_safe === true &&
+      !probe.unsafe_url &&
+      !probe.private_redirect_blocked,
     source_tier: candidate.source_tier || null,
     content_type_matches_kind: !isContentMismatch(probe, candidate),
     redirected: Boolean(probe.redirect_target),
     rate_limited: probe.classification === "rate-limited",
-    transient_failure: ["transient", "timeout"].includes(probe.classification)
+    transient_failure: ["transient", "timeout"].includes(probe.classification),
   };
 }
 
@@ -388,7 +428,7 @@ function githubHeaders() {
   }
   return {
     authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-    "x-github-api-version": "2022-11-28"
+    "x-github-api-version": "2022-11-28",
   };
 }
 
@@ -407,14 +447,20 @@ function normalizeNullableUrl(value) {
 async function mapLimit(items, limit, mapper) {
   const queue = [...items];
   const results = [];
-  const workers = Array.from({ length: Math.min(limit, queue.length) }, async () => {
-    while (queue.length > 0) {
-      const item = queue.shift();
-      results.push(await mapper(item));
-    }
-  });
+  const workers = Array.from(
+    { length: Math.min(limit, queue.length) },
+    async () => {
+      while (queue.length > 0) {
+        const item = queue.shift();
+        results.push(await mapper(item));
+      }
+    },
+  );
   await Promise.all(workers);
-  return results.sort((a, b) => a.netuid - b.netuid || a.candidate_id.localeCompare(b.candidate_id));
+  return results.sort(
+    (a, b) =>
+      a.netuid - b.netuid || a.candidate_id.localeCompare(b.candidate_id),
+  );
 }
 
 function countBy(items, key) {
@@ -423,7 +469,7 @@ function countBy(items, key) {
       items.reduce((accumulator, item) => {
         accumulator[item[key]] = (accumulator[item[key]] || 0) + 1;
         return accumulator;
-      }, {})
-    ).sort(([a], [b]) => a.localeCompare(b))
+      }, {}),
+    ).sort(([a], [b]) => a.localeCompare(b)),
   );
 }

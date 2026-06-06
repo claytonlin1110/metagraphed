@@ -15,15 +15,15 @@ for (const command of commands) {
     encoding: "utf8",
     env: {
       ...process.env,
-      ...(command.env || {})
+      ...(command.env || {}),
     },
-    stdio: "pipe"
+    stdio: "pipe",
   });
   const elapsedMs = Math.round(performance.now() - started);
   results.push({
     script: command.script,
     status: result.status === 0 ? "passed" : "failed",
-    elapsed_ms: elapsedMs
+    elapsed_ms: elapsedMs,
   });
 
   process.stdout.write(result.stdout || "");
@@ -34,8 +34,8 @@ for (const command of commands) {
       stableStringify({
         mode: check ? "check" : "refresh",
         failed_script: command.script,
-        results
-      })
+        results,
+      }),
     );
     process.exit(result.status || 1);
   }
@@ -47,8 +47,8 @@ console.log(
     started_at: startedAt,
     finished_at: new Date().toISOString(),
     result_count: results.length,
-    results
-  })
+    results,
+  }),
 );
 
 function checkCommands() {
@@ -71,7 +71,7 @@ function checkCommands() {
     step("worker:test"),
     step("worker:deploy:dry-run"),
     step("scan:public-safety"),
-    step("test")
+    step("test"),
   ];
 }
 
@@ -85,7 +85,7 @@ function refreshCommands() {
     step("adapters:snapshot"),
     step("build"),
     step("schemas:snapshot"),
-    step("r2:manifest")
+    step("r2:manifest"),
   ];
 
   if (process.env.METAGRAPH_WRITE_PROBE_RESULTS === "1") {
@@ -103,7 +103,7 @@ function refreshCommands() {
     step("worker:test"),
     step("worker:deploy:dry-run"),
     step("scan:public-safety"),
-    step("test")
+    step("test"),
   ];
 }
 

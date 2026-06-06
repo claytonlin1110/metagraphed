@@ -1,18 +1,41 @@
 import assert from "node:assert/strict";
 import path from "node:path";
-import { API_ROUTES, CONTRACT_VERSION, PRIMARY_DOMAIN } from "../src/contracts.mjs";
+import {
+  API_ROUTES,
+  CONTRACT_VERSION,
+  PRIMARY_DOMAIN,
+} from "../src/contracts.mjs";
 import { readJson, repoRoot } from "./lib.mjs";
 
-const openapi = await readJson(path.join(repoRoot, "public/metagraph/openapi.json"));
-const apiIndex = await readJson(path.join(repoRoot, "public/metagraph/api-index.json"));
+const openapi = await readJson(
+  path.join(repoRoot, "public/metagraph/openapi.json"),
+);
+const apiIndex = await readJson(
+  path.join(repoRoot, "public/metagraph/api-index.json"),
+);
 const errors = [];
 
 check(openapi.openapi === "3.1.0", "OpenAPI document must use version 3.1.0");
-check(openapi.info?.version === CONTRACT_VERSION, "OpenAPI info.version must match the backend contract version");
-check(openapi.servers?.[0]?.url === `https://${PRIMARY_DOMAIN}`, "OpenAPI server must point at metagraph.sh");
-check(Boolean(openapi.components?.schemas?.SuccessEnvelope), "OpenAPI must define SuccessEnvelope");
-check(Boolean(openapi.components?.schemas?.ErrorEnvelope), "OpenAPI must define ErrorEnvelope");
-check(Boolean(openapi.components?.schemas?.ResponseMeta), "OpenAPI must define ResponseMeta");
+check(
+  openapi.info?.version === CONTRACT_VERSION,
+  "OpenAPI info.version must match the backend contract version",
+);
+check(
+  openapi.servers?.[0]?.url === `https://${PRIMARY_DOMAIN}`,
+  "OpenAPI server must point at metagraph.sh",
+);
+check(
+  Boolean(openapi.components?.schemas?.SuccessEnvelope),
+  "OpenAPI must define SuccessEnvelope",
+);
+check(
+  Boolean(openapi.components?.schemas?.ErrorEnvelope),
+  "OpenAPI must define ErrorEnvelope",
+);
+check(
+  Boolean(openapi.components?.schemas?.ResponseMeta),
+  "OpenAPI must define ResponseMeta",
+);
 
 const documentedRoutes = new Set();
 for (const [pathValue, methods] of Object.entries(openapi.paths || {})) {
@@ -22,22 +45,42 @@ for (const [pathValue, methods] of Object.entries(openapi.paths || {})) {
 }
 
 for (const route of API_ROUTES) {
-  check(documentedRoutes.has(`${route.method} ${route.path}`), `OpenAPI is missing route ${route.method} ${route.path}`);
+  check(
+    documentedRoutes.has(`${route.method} ${route.path}`),
+    `OpenAPI is missing route ${route.method} ${route.path}`,
+  );
 }
 
 for (const route of apiIndex.routes || []) {
-  check(documentedRoutes.has(`${route.method} ${route.path}`), `api-index route is missing from OpenAPI: ${route.method} ${route.path}`);
+  check(
+    documentedRoutes.has(`${route.method} ${route.path}`),
+    `api-index route is missing from OpenAPI: ${route.method} ${route.path}`,
+  );
 }
 
 for (const route of API_ROUTES) {
   const operation = openapi.paths?.[route.path]?.[route.method.toLowerCase()];
-  check(Boolean(operation?.operationId), `OpenAPI route ${route.path} is missing operationId`);
-  check(Array.isArray(operation?.tags) && operation.tags.length > 0, `OpenAPI route ${route.path} is missing tags`);
-  check(Boolean(operation?.responses?.["200"]?.content?.["application/json"]?.schema), `OpenAPI route ${route.path} is missing 200 JSON schema`);
+  check(
+    Boolean(operation?.operationId),
+    `OpenAPI route ${route.path} is missing operationId`,
+  );
+  check(
+    Array.isArray(operation?.tags) && operation.tags.length > 0,
+    `OpenAPI route ${route.path} is missing tags`,
+  );
+  check(
+    Boolean(
+      operation?.responses?.["200"]?.content?.["application/json"]?.schema,
+    ),
+    `OpenAPI route ${route.path} is missing 200 JSON schema`,
+  );
 }
 
 for (const forbidden of ["subnet.health", "localhost", "127.0.0.1"]) {
-  check(!JSON.stringify(openapi).includes(forbidden), `OpenAPI must not reference ${forbidden}`);
+  check(
+    !JSON.stringify(openapi).includes(forbidden),
+    `OpenAPI must not reference ${forbidden}`,
+  );
 }
 
 if (errors.length > 0) {

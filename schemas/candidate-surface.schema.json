@@ -86,11 +86,7 @@
       ]
     },
     "confidence": {
-      "enum": [
-        "low",
-        "medium",
-        "high"
-      ]
+      "enum": ["low", "medium", "high"]
     },
     "provider": {
       "type": "string"
@@ -104,10 +100,7 @@
     "verification": {
       "type": "object",
       "additionalProperties": true,
-      "required": [
-        "classification",
-        "verified_at"
-      ],
+      "required": ["classification", "verified_at"],
       "properties": {
         "classification": {
           "enum": [

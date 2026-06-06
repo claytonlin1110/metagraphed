@@ -7,9 +7,8 @@ import {
   loadVerification,
   readJson,
   repoRoot,
-  slugify,
   stableStringify,
-  writeJson
+  writeJson,
 } from "./lib.mjs";
 
 const args = new Set(process.argv.slice(2));
@@ -20,7 +19,9 @@ const candidates = await loadCandidates();
 const verification = await loadVerification();
 const manualOverlays = await loadManualOverlays();
 const manualNetuids = new Set(manualOverlays.map((overlay) => overlay.netuid));
-const verificationByCandidate = new Map(verification.results.map((result) => [result.candidate_id, result]));
+const verificationByCandidate = new Map(
+  verification.results.map((result) => [result.candidate_id, result]),
+);
 const candidatesByNetuid = groupByNetuid(candidates);
 const outputRoot = path.join(repoRoot, "registry/subnets/generated");
 const generatedOverlays = [];
@@ -32,7 +33,10 @@ for (const nativeSubnet of nativeSnapshot.subnets) {
   generatedOverlays.push(buildGeneratedOverlay(nativeSubnet));
 }
 
-const promotedSurfaceCount = generatedOverlays.reduce((count, overlay) => count + overlay.surfaces.length, 0);
+const promotedSurfaceCount = generatedOverlays.reduce(
+  (count, overlay) => count + overlay.surfaces.length,
+  0,
+);
 const summary = {
   mode: dryRun ? "dry-run" : "write",
   native_subnet_count: nativeSnapshot.subnets.length,
@@ -40,7 +44,9 @@ const summary = {
   generated_overlay_count: generatedOverlays.length,
   total_overlay_count: manualOverlays.length + generatedOverlays.length,
   promoted_surface_count: promotedSurfaceCount,
-  generated_without_surfaces: generatedOverlays.filter((overlay) => overlay.surfaces.length === 0).map((overlay) => overlay.netuid)
+  generated_without_surfaces: generatedOverlays
+    .filter((overlay) => overlay.surfaces.length === 0)
+    .map((overlay) => overlay.netuid),
 };
 
 if (!dryRun) {
@@ -55,25 +61,40 @@ console.log(stableStringify(summary));
 async function loadManualOverlays() {
   const files = await listJsonFiles(path.join(repoRoot, "registry/subnets"));
   const overlays = await Promise.all(files.map(readJson));
-  return overlays.sort((a, b) => a.netuid - b.netuid || a.slug.localeCompare(b.slug));
+  return overlays.sort(
+    (a, b) => a.netuid - b.netuid || a.slug.localeCompare(b.slug),
+  );
 }
 
 function buildGeneratedOverlay(nativeSubnet) {
   const subnetCandidates = candidatesByNetuid.get(nativeSubnet.netuid) || [];
   const promotedSurfaces = subnetCandidates
-    .map((candidate) => ({ candidate, verification: verificationByCandidate.get(candidate.id) }))
-    .filter(({ candidate, verification }) => isPromotable(candidate, verification))
-    .map(({ candidate, verification }) => promoteCandidate(candidate, verification))
+    .map((candidate) => ({
+      candidate,
+      verification: verificationByCandidate.get(candidate.id),
+    }))
+    .filter(({ candidate, verification }) =>
+      isPromotable(candidate, verification),
+    )
+    .map(({ candidate, verification }) =>
+      promoteCandidate(candidate, verification),
+    )
     .filter(limitPromotedSurfaceKinds())
-    .sort((a, b) => surfaceRank(a.kind) - surfaceRank(b.kind) || a.id.localeCompare(b.id));
+    .sort(
+      (a, b) =>
+        surfaceRank(a.kind) - surfaceRank(b.kind) || a.id.localeCompare(b.id),
+    );
 
   const gaps = calculateGaps(promotedSurfaces);
-  const sourceUrls = new Set(promotedSurfaces.flatMap((surface) => surface.source_urls || []));
-  const verifiedAt = promotedSurfaces
-    .map((surface) => surface.verification?.verified_at)
-    .filter(Boolean)
-    .sort()
-    .at(-1) || null;
+  const sourceUrls = new Set(
+    promotedSurfaces.flatMap((surface) => surface.source_urls || []),
+  );
+  const verifiedAt =
+    promotedSurfaces
+      .map((surface) => surface.verification?.verified_at)
+      .filter(Boolean)
+      .sort()
+      .at(-1) || null;
 
   const slug = nativeSubnet.netuid === 0 ? "root" : `sn-${nativeSubnet.netuid}`;
   const name = nativeSubnet.name || `Subnet ${nativeSubnet.netuid}`;
@@ -84,7 +105,8 @@ function buildGeneratedOverlay(nativeSubnet) {
     name,
     slug,
     status: nativeSubnet.status,
-    categories: nativeSubnet.netuid === 0 ? ["root", "system"] : ["baseline-curated"],
+    categories:
+      nativeSubnet.netuid === 0 ? ["root", "system"] : ["baseline-curated"],
     docs_url: firstUrl(promotedSurfaces, "docs"),
     source_repo: firstUrl(promotedSurfaces, "source-repo"),
     dashboard_url: firstUrl(promotedSurfaces, "dashboard"),
@@ -94,26 +116,35 @@ function buildGeneratedOverlay(nativeSubnet) {
         ? "Machine-generated root/system baseline overlay."
         : "Machine-generated baseline overlay from verified public-source candidates.",
     curation: {
-      level: promotedSurfaces.length > 0 ? "machine-verified" : "candidate-discovered",
+      level:
+        promotedSurfaces.length > 0
+          ? "machine-verified"
+          : "candidate-discovered",
       review_state: "machine-generated",
       reviewed_at: null,
       verified_at: verifiedAt,
       source_count: sourceUrls.size,
-      gap_notes: gaps.gap_notes
+      gap_notes: gaps.gap_notes,
     },
     links: [],
-    surfaces: promotedSurfaces
+    surfaces: promotedSurfaces,
   };
 }
 
 function isPromotable(candidate, verification) {
-  if (!verification || !["live", "redirected"].includes(verification.classification)) {
+  if (
+    !verification ||
+    !["live", "redirected"].includes(verification.classification)
+  ) {
     return false;
   }
   if (isGenericToolingSurface(candidate)) {
     return false;
   }
-  if (candidate.kind === "website" && candidate.source_type === "project-website-link") {
+  if (
+    candidate.kind === "website" &&
+    candidate.source_type === "project-website-link"
+  ) {
     return false;
   }
   if (candidate.kind === "subnet-api") {
@@ -124,7 +155,10 @@ function isPromotable(candidate, verification) {
     if (pathname.endsWith(".json")) {
       return isJsonContentType(verification.content_type);
     }
-    return isJsonContentType(verification.content_type) || isHtmlContentType(verification.content_type);
+    return (
+      isJsonContentType(verification.content_type) ||
+      isHtmlContentType(verification.content_type)
+    );
   }
   return true;
 }
@@ -141,7 +175,8 @@ function isGenericToolingSurface(candidate) {
   const pathname = url.pathname.toLowerCase();
   if (candidate.kind === "openapi") {
     return (
-      (host === "github.com" && ["/swagger", "/swagger.json"].includes(pathname)) ||
+      (host === "github.com" &&
+        ["/swagger", "/swagger.json"].includes(pathname)) ||
       host === "swagger.io" ||
       (host === "github.com" && pathname.includes("/swagger")) ||
       (host === "github.com" && pathname.includes("/swaggo/"))
@@ -160,7 +195,7 @@ function limitPromotedSurfaceKinds() {
     openapi: 3,
     "source-repo": 4,
     "subnet-api": 4,
-    website: 2
+    website: 2,
   };
 
   return (surface) => {
@@ -185,11 +220,15 @@ function isApiContentType(contentType) {
 }
 
 function isJsonContentType(contentType) {
-  return String(contentType || "").toLowerCase().includes("json");
+  return String(contentType || "")
+    .toLowerCase()
+    .includes("json");
 }
 
 function isHtmlContentType(contentType) {
-  return String(contentType || "").toLowerCase().includes("html");
+  return String(contentType || "")
+    .toLowerCase()
+    .includes("html");
 }
 
 function promoteCandidate(candidate, verification) {
@@ -217,22 +256,26 @@ function promoteCandidate(candidate, verification) {
       redirect_target: verification.redirect_target || null,
       status_code: verification.status_code,
       topics: verification.topics,
-      verified_at: verification.verified_at
+      verified_at: verification.verified_at,
     },
     quality_signals: verification.quality_signals,
     rate_limit_notes: candidate.rate_limit_notes,
     probe: probeForKind(candidate.kind),
-    notes: candidate.review_notes
+    notes: candidate.review_notes,
   };
 
   if (candidate.kind === "openapi") {
     const pathname = new URL(candidate.url).pathname.toLowerCase();
-    if (pathname.endsWith(".json") && isJsonContentType(verification.content_type)) {
+    if (
+      pathname.endsWith(".json") &&
+      isJsonContentType(verification.content_type)
+    ) {
       surface.schema_url = candidate.url;
       surface.schema_status = "machine-readable";
     } else {
       surface.schema_status = "ui-only";
-      surface.notes = `${surface.notes || ""} Machine-readable OpenAPI schema has not been captured for this surface.`.trim();
+      surface.notes =
+        `${surface.notes || ""} Machine-readable OpenAPI schema has not been captured for this surface.`.trim();
     }
   }
 
@@ -250,7 +293,7 @@ function calculateGaps(surfaces) {
     ["openapi", "No verified OpenAPI/Swagger surface yet."],
     ["subnet-api", "No verified subnet API surface yet."],
     ["sse", "No verified SSE/event stream yet."],
-    ["data-artifact", "No verified data artifact yet."]
+    ["data-artifact", "No verified data artifact yet."],
   ];
 
   for (const [kind, message] of expected) {
@@ -286,7 +329,7 @@ function surfaceRank(kind) {
       openapi: 5,
       "subnet-api": 6,
       sse: 7,
-      "data-artifact": 8
+      "data-artifact": 8,
     }[kind] || 99
   );
 }

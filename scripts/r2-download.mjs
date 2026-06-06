@@ -5,32 +5,42 @@ import { readJson, repoRoot, sha256Hex, stableStringify } from "./lib.mjs";
 
 const args = new Set(process.argv.slice(2));
 const write = args.has("--write");
-const manifest = await readJson(path.join(repoRoot, "public/metagraph/r2-manifest.json"));
+const manifest = await readJson(
+  path.join(repoRoot, "public/metagraph/r2-manifest.json"),
+);
 const prefixArg = process.argv.find((arg) => arg.startsWith("--prefix="));
-const prefix = prefixArg ? prefixArg.slice("--prefix=".length).replace(/^\/+|\/+$/g, "") + "/" : manifest.latest_prefix;
+const prefix = prefixArg
+  ? prefixArg.slice("--prefix=".length).replace(/^\/+|\/+$/g, "") + "/"
+  : manifest.latest_prefix;
 const outputDirArg = process.argv.find((arg) => arg.startsWith("--out="));
-const outputDir = outputDirArg ? outputDirArg.slice("--out=".length) : "tmp/r2-download";
+const outputDir = outputDirArg
+  ? outputDirArg.slice("--out=".length)
+  : "tmp/r2-download";
 const planned = manifest.artifacts.map((artifact) => ({
   key: `${prefix}${artifact.path.replace(/^\/metagraph\//, "")}`,
   local_path: path.join(outputDir, artifact.path.replace(/^\/metagraph\//, "")),
   sha256: artifact.sha256,
-  size_bytes: artifact.size_bytes
+  size_bytes: artifact.size_bytes,
 }));
 
 if (!write) {
-  console.log(stableStringify({
-    mode: "dry-run",
-    artifact_count: planned.length,
-    bucket_name: manifest.bucket_name,
-    output_dir: outputDir,
-    prefix,
-    sample: planned.slice(0, 10)
-  }));
+  console.log(
+    stableStringify({
+      mode: "dry-run",
+      artifact_count: planned.length,
+      bucket_name: manifest.bucket_name,
+      output_dir: outputDir,
+      prefix,
+      sample: planned.slice(0, 10),
+    }),
+  );
   process.exit(0);
 }
 
 if (process.env.METAGRAPH_ALLOW_R2_DOWNLOAD !== "1") {
-  console.error("Refusing to download from R2 without METAGRAPH_ALLOW_R2_DOWNLOAD=1.");
+  console.error(
+    "Refusing to download from R2 without METAGRAPH_ALLOW_R2_DOWNLOAD=1.",
+  );
   process.exit(1);
 }
 
@@ -40,23 +50,36 @@ for (const artifact of planned) {
   await verifyDownloadedArtifact(artifact);
 }
 
-console.log(`Downloaded ${planned.length} artifact(s) from R2 bucket ${manifest.bucket_name}.`);
+console.log(
+  `Downloaded ${planned.length} artifact(s) from R2 bucket ${manifest.bucket_name}.`,
+);
 
 async function verifyDownloadedArtifact(artifact) {
   const actual = sha256Hex(await readFile(artifact.local_path));
   if (actual !== artifact.sha256) {
-    throw new Error(`downloaded artifact hash mismatch for ${artifact.key}: expected ${artifact.sha256}, got ${actual}`);
+    throw new Error(
+      `downloaded artifact hash mismatch for ${artifact.key}: expected ${artifact.sha256}, got ${actual}`,
+    );
   }
 }
 
 function getObject(key, localPath, bucketName) {
   const result = spawnSync(
     "npx",
-    ["--yes", "wrangler", "r2", "object", "get", `${bucketName}/${key}`, "--file", localPath],
+    [
+      "--yes",
+      "wrangler",
+      "r2",
+      "object",
+      "get",
+      `${bucketName}/${key}`,
+      "--file",
+      localPath,
+    ],
     {
       encoding: "utf8",
-      stdio: "pipe"
-    }
+      stdio: "pipe",
+    },
   );
   if (result.status !== 0) {
     console.error(result.stdout);

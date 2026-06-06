@@ -16,13 +16,13 @@ import {
   repoRoot,
   sha256Hex,
   slugify,
-  writeJson
+  writeJson,
 } from "./lib.mjs";
 import {
   CONTRACT_VERSION,
   buildApiIndexArtifact,
   buildContractsArtifact,
-  buildOpenApiArtifact
+  buildOpenApiArtifact,
 } from "../src/contracts.mjs";
 
 const providers = await loadProviders();
@@ -32,22 +32,38 @@ const verification = await loadVerification();
 const adapterSnapshots = await loadAdapterSnapshots();
 const reviewDecisions = await loadReviewDecisions();
 const nativeSnapshot = await loadNativeSnapshot();
-const overlayByNetuid = new Map(overlays.map((overlay) => [overlay.netuid, overlay]));
+const overlayByNetuid = new Map(
+  overlays.map((overlay) => [overlay.netuid, overlay]),
+);
 const chainSubnets = nativeSnapshot.subnets;
 const candidatesByNetuid = groupByNetuid(candidates);
-const verificationByCandidate = new Map((verification.results || []).map((result) => [result.candidate_id, result]));
-const mergedSubnets = chainSubnets.map((nativeSubnet) =>
-  mergeSubnet(nativeSubnet, overlayByNetuid.get(nativeSubnet.netuid), candidatesByNetuid.get(nativeSubnet.netuid)?.length || 0)
+const verificationByCandidate = new Map(
+  (verification.results || []).map((result) => [result.candidate_id, result]),
 );
-const activeOverlayNetuids = new Set(chainSubnets.map((subnet) => subnet.netuid));
-const activeOverlays = overlays.filter((overlay) => activeOverlayNetuids.has(overlay.netuid));
+const mergedSubnets = chainSubnets.map((nativeSubnet) =>
+  mergeSubnet(
+    nativeSubnet,
+    overlayByNetuid.get(nativeSubnet.netuid),
+    candidatesByNetuid.get(nativeSubnet.netuid)?.length || 0,
+  ),
+);
+const activeOverlayNetuids = new Set(
+  chainSubnets.map((subnet) => subnet.netuid),
+);
+const activeOverlays = overlays.filter((overlay) =>
+  activeOverlayNetuids.has(overlay.netuid),
+);
 const surfaces = flattenSurfaces(activeOverlays);
 const outputRoot = path.join(repoRoot, "public/metagraph");
 const generatedAt = buildTimestamp();
 const contractVersion = CONTRACT_VERSION;
 const previousArtifactDigests = await collectArtifactDigests(outputRoot);
-const previousSubnetsArtifact = await readOptionalJson(path.join(outputRoot, "subnets.json"));
-const previousCoverageArtifact = await readOptionalJson(path.join(outputRoot, "coverage.json"));
+const previousSubnetsArtifact = await readOptionalJson(
+  path.join(outputRoot, "subnets.json"),
+);
+const previousCoverageArtifact = await readOptionalJson(
+  path.join(outputRoot, "coverage.json"),
+);
 
 const subnetIndex = mergedSubnets.map((subnet) => ({
   block: subnet.block,
@@ -72,7 +88,7 @@ const subnetIndex = mergedSubnets.map((subnet) => ({
   surface_count: subnet.surface_count,
   symbol: subnet.symbol,
   tempo: subnet.tempo,
-  website_url: subnet.website_url
+  website_url: subnet.website_url,
 }));
 
 const metagraphLatest = {
@@ -81,8 +97,9 @@ const metagraphLatest = {
   network: nativeSnapshot.network,
   source: nativeSnapshot.source,
   captured_at: nativeSnapshot.captured_at,
-  notes: "Native Bittensor chain data is canonical for active subnet existence. Curated overlays add public interface metadata where verified.",
-  subnets: subnetIndex
+  notes:
+    "Native Bittensor chain data is canonical for active subnet existence. Curated overlays add public interface metadata where verified.",
+  subnets: subnetIndex,
 };
 
 const healthArtifacts = buildHealthArtifacts(
@@ -105,24 +122,30 @@ const healthArtifacts = buildHealthArtifacts(
       surface_id: surface.id,
       url: surface.url,
       uptime_sample_ratio: null,
-      verified_at: null
+      verified_at: null,
     })),
   mergedSubnets,
   {
     generatedAt,
     notes:
       "Run npm run probes:smoke with METAGRAPH_WRITE_PROBE_RESULTS=1 to replace unknown build-time health with live probe results.",
-    source: "artifact-build"
-  }
+    source: "artifact-build",
+  },
 );
 const rpcEndpoints = buildRpcEndpointArtifact({
   surfaces,
   healthSurfaces: healthArtifacts.latest.surfaces,
   generatedAt,
   contractVersion,
-  source: "artifact-build"
+  source: "artifact-build",
 });
-const curationReview = buildCurationReview(mergedSubnets, surfaces, candidates, verification, reviewDecisions);
+const curationReview = buildCurationReview(
+  mergedSubnets,
+  surfaces,
+  candidates,
+  verification,
+  reviewDecisions,
+);
 const schemaDriftPlaceholder = buildSchemaDriftPlaceholder(surfaces);
 const contracts = buildContractsArtifact(generatedAt);
 const openApi = buildOpenApiArtifact(generatedAt);
@@ -139,9 +162,9 @@ const adapterArtifacts = Object.fromEntries(
         subnet: subnet.name,
         slug: subnet.slug,
         extensions: subnet.extensions,
-        snapshot: adapterSnapshots.get(subnet.slug) || null
-      }
-    ])
+        snapshot: adapterSnapshots.get(subnet.slug) || null,
+      },
+    ]),
 );
 
 const coverage = {
@@ -152,36 +175,55 @@ const coverage = {
   source: {
     native: nativeSnapshot.source,
     overlays: "registry/subnets",
-    candidates: "registry/candidates"
+    candidates: "registry/candidates",
   },
   chain_subnet_count: chainSubnets.length,
-  root_subnet_count: mergedSubnets.filter((subnet) => subnet.subnet_type === "root").length,
-  application_subnet_count: mergedSubnets.filter((subnet) => subnet.subnet_type === "application").length,
+  root_subnet_count: mergedSubnets.filter(
+    (subnet) => subnet.subnet_type === "root",
+  ).length,
+  application_subnet_count: mergedSubnets.filter(
+    (subnet) => subnet.subnet_type === "application",
+  ).length,
   curated_overlay_count: activeOverlays.length,
-  native_only_count: mergedSubnets.filter((subnet) => subnet.coverage_level === "native-only").length,
-  manifested_count: mergedSubnets.filter((subnet) => subnet.coverage_level === "manifested").length,
-  probed_count: mergedSubnets.filter((subnet) => subnet.coverage_level === "probed").length,
+  native_only_count: mergedSubnets.filter(
+    (subnet) => subnet.coverage_level === "native-only",
+  ).length,
+  manifested_count: mergedSubnets.filter(
+    (subnet) => subnet.coverage_level === "manifested",
+  ).length,
+  probed_count: mergedSubnets.filter(
+    (subnet) => subnet.coverage_level === "probed",
+  ).length,
   surface_count: surfaces.length,
-  probed_surface_count: surfaces.filter((surface) => surface.probe?.enabled).length,
+  probed_surface_count: surfaces.filter((surface) => surface.probe?.enabled)
+    .length,
   candidate_count: candidates.length,
   candidate_subnet_count: candidatesByNetuid.size,
-  curation_level_counts: countBy(mergedSubnets, (subnet) => subnet.curation.level),
+  curation_level_counts: countBy(
+    mergedSubnets,
+    (subnet) => subnet.curation.level,
+  ),
   native_only_with_candidates: mergedSubnets.filter(
-    (subnet) => subnet.coverage_level === "native-only" && subnet.candidate_count > 0
+    (subnet) =>
+      subnet.coverage_level === "native-only" && subnet.candidate_count > 0,
   ).length,
   native_only_without_candidates: mergedSubnets.filter(
-    (subnet) => subnet.coverage_level === "native-only" && subnet.candidate_count === 0
-  ).length
+    (subnet) =>
+      subnet.coverage_level === "native-only" && subnet.candidate_count === 0,
+  ).length,
 };
 
 const candidateIndex = candidates.map((candidate) => ({
   ...candidate,
-  verification: verificationByCandidate.get(candidate.id) || candidate.verification || null,
-  subnet_name: nativeSnapshot.subnets.find((subnet) => subnet.netuid === candidate.netuid)?.name || null
+  verification:
+    verificationByCandidate.get(candidate.id) || candidate.verification || null,
+  subnet_name:
+    nativeSnapshot.subnets.find((subnet) => subnet.netuid === candidate.netuid)
+      ?.name || null,
 }));
 
 const reviewQueue = candidateIndex.filter((candidate) =>
-  ["schema-valid", "maintainer-review", "stale"].includes(candidate.state)
+  ["schema-valid", "maintainer-review", "stale"].includes(candidate.state),
 );
 
 const curationIndex = mergedSubnets.map((subnet) => ({
@@ -193,7 +235,7 @@ const curationIndex = mergedSubnets.map((subnet) => ({
   name: subnet.name,
   netuid: subnet.netuid,
   slug: subnet.slug,
-  surface_count: subnet.surface_count
+  surface_count: subnet.surface_count,
 }));
 
 const gapsIndex = mergedSubnets.map((subnet) => ({
@@ -202,13 +244,13 @@ const gapsIndex = mergedSubnets.map((subnet) => ({
   gaps: subnet.gaps,
   name: subnet.name,
   netuid: subnet.netuid,
-  slug: subnet.slug
+  slug: subnet.slug,
 }));
 
 await writeJson(path.join(outputRoot, "providers.json"), {
   schema_version: 1,
   generated_at: generatedAt,
-  providers
+  providers,
 });
 
 await writeJson(path.join(outputRoot, "subnets.json"), {
@@ -217,13 +259,15 @@ await writeJson(path.join(outputRoot, "subnets.json"), {
   network: nativeSnapshot.network,
   source: nativeSnapshot.source,
   native_snapshot_captured_at: nativeSnapshot.captured_at,
-  subnets: subnetIndex
+  subnets: subnetIndex,
 });
 
 await fs.rm(path.join(outputRoot, "subnets"), { recursive: true, force: true });
 for (const subnet of mergedSubnets) {
   const subnetCandidates = candidatesByNetuid.get(subnet.netuid) || [];
-  const subnetSurfaces = surfaces.filter((surface) => surface.netuid === subnet.netuid);
+  const subnetSurfaces = surfaces.filter(
+    (surface) => surface.netuid === subnet.netuid,
+  );
   await writeJson(path.join(outputRoot, `subnets/${subnet.netuid}.json`), {
     schema_version: 1,
     generated_at: generatedAt,
@@ -232,131 +276,179 @@ for (const subnet of mergedSubnets) {
     candidates: subnetCandidates,
     gaps: subnet.gaps,
     surfaces: subnetSurfaces,
-    verified_surfaces: subnetSurfaces
+    verified_surfaces: subnetSurfaces,
   });
 }
 
 await writeJson(path.join(outputRoot, "surfaces.json"), {
   schema_version: 1,
   generated_at: generatedAt,
-  notes: "Curated and verified public interface surfaces only. Native-only subnet stubs do not invent surfaces.",
-  surfaces
+  notes:
+    "Curated and verified public interface surfaces only. Native-only subnet stubs do not invent surfaces.",
+  surfaces,
 });
 
 await writeJson(path.join(outputRoot, "candidates.json"), {
   schema_version: 1,
   generated_at: generatedAt,
-  notes: "Unverified candidate surfaces from public source discovery and community intake. Candidates are not verified registry surfaces.",
-  candidates: candidateIndex
+  notes:
+    "Unverified candidate surfaces from public source discovery and community intake. Candidates are not verified registry surfaces.",
+  candidates: candidateIndex,
 });
 
 await writeJson(path.join(outputRoot, "review-queue.json"), {
   schema_version: 1,
   generated_at: generatedAt,
-  notes: "Candidate surfaces that need maintainer review before promotion into curated subnet overlays.",
+  notes:
+    "Candidate surfaces that need maintainer review before promotion into curated subnet overlays.",
   count: reviewQueue.length,
-  candidates: reviewQueue
+  candidates: reviewQueue,
 });
 
 await writeJson(path.join(outputRoot, "curation.json"), {
   schema_version: 1,
   generated_at: generatedAt,
   notes: "Curation status for every active Finney subnet.",
-  curation: curationIndex
+  curation: curationIndex,
 });
 
 await writeJson(path.join(outputRoot, "gaps.json"), {
   schema_version: 1,
   generated_at: generatedAt,
-  notes: "Missing or unsupported public interface facets by subnet. Missing facets are not invented.",
-  gaps: gapsIndex
+  notes:
+    "Missing or unsupported public interface facets by subnet. Missing facets are not invented.",
+  gaps: gapsIndex,
 });
 
 await writeJson(path.join(outputRoot, "verification/latest.json"), {
   ...verification,
-  generated_at: verification.generated_at || generatedAt
+  generated_at: verification.generated_at || generatedAt,
 });
 
-await writeJson(path.join(outputRoot, "metagraph/latest.json"), metagraphLatest);
-await fs.rm(path.join(outputRoot, "health/subnets"), { recursive: true, force: true });
-await fs.rm(path.join(outputRoot, "health/badges"), { recursive: true, force: true });
-await writeJson(path.join(outputRoot, "health/latest.json"), healthArtifacts.latest);
-await writeJson(path.join(outputRoot, "health/summary.json"), healthArtifacts.summary);
+await writeJson(
+  path.join(outputRoot, "metagraph/latest.json"),
+  metagraphLatest,
+);
+await fs.rm(path.join(outputRoot, "health/subnets"), {
+  recursive: true,
+  force: true,
+});
+await fs.rm(path.join(outputRoot, "health/badges"), {
+  recursive: true,
+  force: true,
+});
+await writeJson(
+  path.join(outputRoot, "health/latest.json"),
+  healthArtifacts.latest,
+);
+await writeJson(
+  path.join(outputRoot, "health/summary.json"),
+  healthArtifacts.summary,
+);
 await writeJson(path.join(outputRoot, "rpc-endpoints.json"), rpcEndpoints);
 for (const [netuid, subnetHealth] of healthArtifacts.subnets) {
-  await writeJson(path.join(outputRoot, `health/subnets/${netuid}.json`), subnetHealth);
+  await writeJson(
+    path.join(outputRoot, `health/subnets/${netuid}.json`),
+    subnetHealth,
+  );
 }
 for (const [netuid, badge] of healthArtifacts.badges) {
   await writeJson(path.join(outputRoot, `health/badges/${netuid}.json`), badge);
 }
 await writeJson(path.join(outputRoot, "coverage.json"), coverage);
 await writeJson(path.join(outputRoot, "contracts.json"), contracts);
-await writeJson(path.join(outputRoot, "api-index.json"), buildApiIndexArtifact(generatedAt, contracts));
+await writeJson(
+  path.join(outputRoot, "api-index.json"),
+  buildApiIndexArtifact(generatedAt, contracts),
+);
 await writeJson(path.join(outputRoot, "openapi.json"), openApi);
-await writeJson(path.join(outputRoot, "search.json"), buildSearchIndex(mergedSubnets, surfaces, providers));
-await writeJson(path.join(outputRoot, "freshness.json"), buildFreshnessArtifact({
-  adapterSnapshots,
-  generatedAt,
-  healthArtifacts,
-  nativeSnapshot,
-  schemaDrift: schemaDriftPlaceholder,
-  verification
-}));
-await writeJson(path.join(outputRoot, "source-health.json"), buildSourceHealthArtifact({
-  candidates,
-  providers,
-  rpcEndpoints,
-  verification
-}));
-await writeJson(path.join(outputRoot, "evidence-ledger.json"), buildEvidenceLedger({
-  candidates,
-  generatedAt,
-  subnets: mergedSubnets,
-  surfaces
-}));
-await writeJson(path.join(outputRoot, "rpc/pools.json"), buildEndpointPoolArtifact({
-  generatedAt,
-  contractVersion,
-  rpcArtifact: rpcEndpoints
-}));
-await writeJson(path.join(outputRoot, "source-snapshots.json"), await buildSourceSnapshots({
-  adapterSnapshots,
-  candidates,
-  generatedAt,
-  nativeSnapshot,
-  overlays: activeOverlays,
-  providers,
-  reviewDecisions,
-  verification
-}));
-await writeJson(path.join(outputRoot, "schema-drift.json"), schemaDriftPlaceholder);
+await writeJson(
+  path.join(outputRoot, "search.json"),
+  buildSearchIndex(mergedSubnets, surfaces, providers),
+);
+await writeJson(
+  path.join(outputRoot, "freshness.json"),
+  buildFreshnessArtifact({
+    adapterSnapshots,
+    generatedAt,
+    healthArtifacts,
+    nativeSnapshot,
+    schemaDrift: schemaDriftPlaceholder,
+    verification,
+  }),
+);
+await writeJson(
+  path.join(outputRoot, "source-health.json"),
+  buildSourceHealthArtifact({
+    candidates,
+    providers,
+    rpcEndpoints,
+    verification,
+  }),
+);
+await writeJson(
+  path.join(outputRoot, "evidence-ledger.json"),
+  buildEvidenceLedger({
+    candidates,
+    generatedAt,
+    subnets: mergedSubnets,
+    surfaces,
+  }),
+);
+await writeJson(
+  path.join(outputRoot, "rpc/pools.json"),
+  buildEndpointPoolArtifact({
+    generatedAt,
+    contractVersion,
+    rpcArtifact: rpcEndpoints,
+  }),
+);
+await writeJson(
+  path.join(outputRoot, "source-snapshots.json"),
+  await buildSourceSnapshots({
+    adapterSnapshots,
+    candidates,
+    generatedAt,
+    nativeSnapshot,
+    overlays: activeOverlays,
+    providers,
+    reviewDecisions,
+    verification,
+  }),
+);
+await writeJson(
+  path.join(outputRoot, "schema-drift.json"),
+  schemaDriftPlaceholder,
+);
 await writeJson(path.join(outputRoot, "schemas/index.json"), {
   schema_version: 1,
   contract_version: contractVersion,
   generated_at: generatedAt,
   source: "artifact-build",
-  notes: "Run npm run schemas:snapshot to capture machine-readable OpenAPI/Swagger schema snapshots.",
-  schemas: []
+  notes:
+    "Run npm run schemas:snapshot to capture machine-readable OpenAPI/Swagger schema snapshots.",
+  schemas: [],
 });
 await writeJson(path.join(outputRoot, "review/curation.json"), curationReview);
 await writeJson(path.join(outputRoot, "review/gap-priorities.json"), {
   schema_version: 1,
   contract_version: contractVersion,
   generated_at: generatedAt,
-  priorities: curationReview.gap_priorities
+  priorities: curationReview.gap_priorities,
 });
 await writeJson(path.join(outputRoot, "review/adapter-candidates.json"), {
   schema_version: 1,
   contract_version: contractVersion,
   generated_at: generatedAt,
-  candidates: curationReview.adapter_candidates
+  candidates: curationReview.adapter_candidates,
 });
 await writeJson(path.join(outputRoot, "review/maintainer-decisions.json"), {
   schema_version: 1,
   contract_version: contractVersion,
   generated_at: generatedAt,
   decisions: reviewDecisions.decisions || [],
-  notes: "Public-safe maintainer curation decisions only. No secrets, wallets, PATs, private dashboards, or validator-local state."
+  notes:
+    "Public-safe maintainer curation decisions only. No secrets, wallets, PATs, private dashboards, or validator-local state.",
 });
 
 for (const [slug, artifact] of Object.entries(adapterArtifacts)) {
@@ -364,21 +456,27 @@ for (const [slug, artifact] of Object.entries(adapterArtifacts)) {
 }
 
 const currentArtifactDigests = await collectArtifactDigests(outputRoot);
-await writeJson(path.join(outputRoot, "changelog.json"), buildChangelog({
-  currentArtifacts: currentArtifactDigests,
-  currentCoverage: coverage,
-  currentSubnets: { subnets: subnetIndex },
-  generatedAt,
-  previousArtifacts: previousArtifactDigests,
-  previousCoverage: previousCoverageArtifact,
-  previousSubnets: previousSubnetsArtifact
-}));
+await writeJson(
+  path.join(outputRoot, "changelog.json"),
+  buildChangelog({
+    currentArtifacts: currentArtifactDigests,
+    currentCoverage: coverage,
+    currentSubnets: { subnets: subnetIndex },
+    generatedAt,
+    previousArtifacts: previousArtifactDigests,
+    previousCoverage: previousCoverageArtifact,
+    previousSubnets: previousSubnetsArtifact,
+  }),
+);
 
 const artifactSizesBeforeR2 = await collectArtifactSizes(outputRoot);
-await writeJson(path.join(outputRoot, "r2-manifest.json"), buildR2Manifest({
-  artifactSizes: artifactSizesBeforeR2,
-  generatedAt
-}));
+await writeJson(
+  path.join(outputRoot, "r2-manifest.json"),
+  buildR2Manifest({
+    artifactSizes: artifactSizesBeforeR2,
+    generatedAt,
+  }),
+);
 
 const artifactSizes = await collectArtifactSizes(outputRoot);
 await writeJson(path.join(outputRoot, "build-summary.json"), {
@@ -387,7 +485,10 @@ await writeJson(path.join(outputRoot, "build-summary.json"), {
   generated_at: generatedAt,
   adapter_count: Object.keys(adapterArtifacts).length,
   artifact_count: artifactSizes.length,
-  artifact_size_bytes: artifactSizes.reduce((sum, artifact) => sum + artifact.size_bytes, 0),
+  artifact_size_bytes: artifactSizes.reduce(
+    (sum, artifact) => sum + artifact.size_bytes,
+    0,
+  ),
   artifacts: artifactSizes.slice(0, 250),
   candidate_count: candidates.length,
   coverage,
@@ -396,22 +497,32 @@ await writeJson(path.join(outputRoot, "build-summary.json"), {
   surface_count: surfaces.length,
   public_contract: {
     version: contractVersion,
-    url: "/metagraph/contracts.json"
-  }
+    url: "/metagraph/contracts.json",
+  },
 });
 
-console.log(`Built ${mergedSubnets.length} subnet(s), ${surfaces.length} surface(s), and ${providers.length} provider(s).`);
+console.log(
+  `Built ${mergedSubnets.length} subnet(s), ${surfaces.length} surface(s), and ${providers.length} provider(s).`,
+);
 
 function mergeSubnet(nativeSubnet, overlay, candidateCount) {
   const surfaceCount = overlay?.surfaces?.length || 0;
-  const probedSurfaceCount = overlay?.surfaces?.filter((surface) => surface.probe?.enabled).length || 0;
-  const coverageLevel = surfaceCount === 0 ? "native-only" : probedSurfaceCount > 0 ? "probed" : "manifested";
+  const probedSurfaceCount =
+    overlay?.surfaces?.filter((surface) => surface.probe?.enabled).length || 0;
+  const coverageLevel =
+    surfaceCount === 0
+      ? "native-only"
+      : probedSurfaceCount > 0
+        ? "probed"
+        : "manifested";
   const slug = overlay?.slug || `sn-${nativeSubnet.netuid}`;
 
   return {
     block: nativeSubnet.block,
     candidate_count: candidateCount,
-    categories: overlay?.categories || (nativeSubnet.netuid === 0 ? ["root", "system"] : ["native-only"]),
+    categories:
+      overlay?.categories ||
+      (nativeSubnet.netuid === 0 ? ["root", "system"] : ["native-only"]),
     coverage_level: coverageLevel,
     dashboard_url: overlay?.dashboard_url || null,
     docs_url: overlay?.docs_url || null,
@@ -430,9 +541,11 @@ function mergeSubnet(nativeSubnet, overlay, candidateCount) {
         captured_at: nativeSnapshot.captured_at,
         method: nativeSnapshot.source.method,
         network: nativeSnapshot.network,
-        source_kind: nativeSnapshot.source.kind
+        source_kind: nativeSnapshot.source.kind,
       },
-      interface_metadata: overlay ? overlay.curation?.level || "curated-overlay" : "none"
+      interface_metadata: overlay
+        ? overlay.curation?.level || "curated-overlay"
+        : "none",
     },
     registered_at_block: nativeSubnet.registered_at_block,
     slug,
@@ -449,9 +562,9 @@ function mergeSubnet(nativeSubnet, overlay, candidateCount) {
       reviewed_at: null,
       verified_at: null,
       source_count: 0,
-      gap_notes: []
+      gap_notes: [],
     },
-    links: overlay?.links || []
+    links: overlay?.links || [],
   };
 }
 
@@ -469,12 +582,21 @@ function buildGaps(surfaces, overlay) {
   if (overlay?.dashboard_url) {
     kinds.add("dashboard");
   }
-  const expectedKinds = ["docs", "source-repo", "website", "dashboard", "openapi", "subnet-api", "sse", "data-artifact"];
+  const expectedKinds = [
+    "docs",
+    "source-repo",
+    "website",
+    "dashboard",
+    "openapi",
+    "subnet-api",
+    "sse",
+    "data-artifact",
+  ];
   const missingKinds = expectedKinds.filter((kind) => !kinds.has(kind));
   return {
     missing_kinds: missingKinds,
     supported_kinds: [...kinds].sort(),
-    gap_notes: overlay?.curation?.gap_notes || []
+    gap_notes: overlay?.curation?.gap_notes || [],
   };
 }
 
@@ -482,11 +604,12 @@ function countBy(items, keyOrFn) {
   return Object.fromEntries(
     Object.entries(
       items.reduce((accumulator, item) => {
-        const key = typeof keyOrFn === "function" ? keyOrFn(item) : item[keyOrFn];
+        const key =
+          typeof keyOrFn === "function" ? keyOrFn(item) : item[keyOrFn];
         accumulator[key] = (accumulator[key] || 0) + 1;
         return accumulator;
-      }, {})
-    ).sort(([a], [b]) => a.localeCompare(b))
+      }, {}),
+    ).sort(([a], [b]) => a.localeCompare(b)),
   );
 }
 
@@ -508,11 +631,25 @@ function buildHealthArtifacts(surfaceHealth, subnets, options) {
 
   for (const subnet of subnets) {
     const subnetSurfaces = byNetuid.get(subnet.netuid) || [];
-    const okCount = subnetSurfaces.filter((surface) => surface.status === "ok").length;
-    const failedCount = subnetSurfaces.filter((surface) => surface.status === "failed").length;
-    const unknownCount = subnetSurfaces.filter((surface) => surface.status === "unknown").length;
-    const degradedCount = subnetSurfaces.filter((surface) => surface.status === "degraded").length;
-    const status = classifySubnetStatus({ okCount, failedCount, unknownCount, degradedCount, surfaceCount: subnetSurfaces.length });
+    const okCount = subnetSurfaces.filter(
+      (surface) => surface.status === "ok",
+    ).length;
+    const failedCount = subnetSurfaces.filter(
+      (surface) => surface.status === "failed",
+    ).length;
+    const unknownCount = subnetSurfaces.filter(
+      (surface) => surface.status === "unknown",
+    ).length;
+    const degradedCount = subnetSurfaces.filter(
+      (surface) => surface.status === "degraded",
+    ).length;
+    const status = classifySubnetStatus({
+      okCount,
+      failedCount,
+      unknownCount,
+      degradedCount,
+      surfaceCount: subnetSurfaces.length,
+    });
     const summary = {
       netuid: subnet.netuid,
       slug: subnet.slug,
@@ -523,13 +660,17 @@ function buildHealthArtifacts(surfaceHealth, subnets, options) {
       failed_count: failedCount,
       degraded_count: degradedCount,
       unknown_count: unknownCount,
-      last_checked: latestString(subnetSurfaces.map((surface) => surface.verified_at || surface.last_checked)),
+      last_checked: latestString(
+        subnetSurfaces.map(
+          (surface) => surface.verified_at || surface.last_checked,
+        ),
+      ),
       last_ok: latestString(subnetSurfaces.map((surface) => surface.last_ok)),
       avg_latency_ms: average(
         subnetSurfaces
           .filter((surface) => Number.isFinite(surface.latency_ms))
-          .map((surface) => surface.latency_ms)
-      )
+          .map((surface) => surface.latency_ms),
+      ),
     };
 
     summaryRows.push(summary);
@@ -541,7 +682,7 @@ function buildHealthArtifacts(surfaceHealth, subnets, options) {
       slug: subnet.slug,
       name: subnet.name,
       summary,
-      surfaces: subnetSurfaces
+      surfaces: subnetSurfaces,
     });
     badgeArtifacts.set(subnet.netuid, {
       schema_version: 1,
@@ -555,7 +696,7 @@ function buildHealthArtifacts(surfaceHealth, subnets, options) {
       surface_count: subnetSurfaces.length,
       ok_count: okCount,
       failed_count: failedCount,
-      unknown_count: unknownCount
+      unknown_count: unknownCount,
     });
   }
 
@@ -568,9 +709,12 @@ function buildHealthArtifacts(surfaceHealth, subnets, options) {
     summary: {
       surface_count: surfaceHealth.length,
       status_counts: countBy(surfaceHealth, (surface) => surface.status),
-      classification_counts: countBy(surfaceHealth, (surface) => surface.classification || "unknown")
+      classification_counts: countBy(
+        surfaceHealth,
+        (surface) => surface.classification || "unknown",
+      ),
     },
-    surfaces: surfaceHealth
+    surfaces: surfaceHealth,
   };
 
   return {
@@ -581,24 +725,37 @@ function buildHealthArtifacts(surfaceHealth, subnets, options) {
       generated_at: options.generatedAt,
       source: options.source,
       global: latest.summary,
-      subnets: summaryRows.sort((a, b) => a.netuid - b.netuid)
+      subnets: summaryRows.sort((a, b) => a.netuid - b.netuid),
     },
     subnets: subnetArtifacts,
-    badges: badgeArtifacts
+    badges: badgeArtifacts,
   };
 }
 
-function buildCurationReview(subnets, surfaces, candidates, verificationArtifact, reviewDecisionsDocument) {
+function buildCurationReview(
+  subnets,
+  surfaces,
+  candidates,
+  verificationArtifact,
+  reviewDecisionsDocument,
+) {
   const surfacesByNetuid = groupByNetuid(surfaces);
   const candidatesByNetuid = groupByNetuid(candidates);
-  const verificationByCandidate = new Map((verificationArtifact.results || []).map((result) => [result.candidate_id, result]));
+  const verificationByCandidate = new Map(
+    (verificationArtifact.results || []).map((result) => [
+      result.candidate_id,
+      result,
+    ]),
+  );
   const gapPriorities = subnets
     .map((subnet) => {
       const subnetSurfaces = surfacesByNetuid.get(subnet.netuid) || [];
       const subnetCandidates = candidatesByNetuid.get(subnet.netuid) || [];
       const missingKinds = subnet.gaps.missing_kinds || [];
       const verifiedCandidateCount = subnetCandidates.filter((candidate) =>
-        ["live", "redirected"].includes(verificationByCandidate.get(candidate.id)?.classification)
+        ["live", "redirected"].includes(
+          verificationByCandidate.get(candidate.id)?.classification,
+        ),
       ).length;
       return {
         netuid: subnet.netuid,
@@ -610,17 +767,32 @@ function buildCurationReview(subnets, surfaces, candidates, verificationArtifact
         candidate_count: subnetCandidates.length,
         verified_candidate_count: verifiedCandidateCount,
         missing_kinds: missingKinds,
-        priority_score: reviewPriorityScore(subnet, subnetSurfaces, subnetCandidates),
-        suggested_next_action: suggestedReviewAction(subnet, subnetSurfaces, subnetCandidates)
+        priority_score: reviewPriorityScore(
+          subnet,
+          subnetSurfaces,
+          subnetCandidates,
+        ),
+        suggested_next_action: suggestedReviewAction(
+          subnet,
+          subnetSurfaces,
+          subnetCandidates,
+        ),
       };
     })
-    .sort((a, b) => b.priority_score - a.priority_score || b.candidate_count - a.candidate_count || a.netuid - b.netuid);
+    .sort(
+      (a, b) =>
+        b.priority_score - a.priority_score ||
+        b.candidate_count - a.candidate_count ||
+        a.netuid - b.netuid,
+    );
 
   const adapterCandidates = subnets
     .map((subnet) => {
       const subnetSurfaces = surfacesByNetuid.get(subnet.netuid) || [];
       const operationalKinds = subnetSurfaces.filter((surface) =>
-        ["openapi", "subnet-api", "sse", "data-artifact"].includes(surface.kind)
+        ["openapi", "subnet-api", "sse", "data-artifact"].includes(
+          surface.kind,
+        ),
       );
       return {
         netuid: subnet.netuid,
@@ -628,53 +800,73 @@ function buildCurationReview(subnets, surfaces, candidates, verificationArtifact
         name: subnet.name,
         curation_level: subnet.curation.level,
         operational_surface_count: operationalKinds.length,
-        operational_kinds: [...new Set(operationalKinds.map((surface) => surface.kind))].sort(),
-        candidate_api_count: (candidatesByNetuid.get(subnet.netuid) || []).filter((candidate) =>
-          ["openapi", "subnet-api", "sse", "data-artifact"].includes(candidate.kind)
+        operational_kinds: [
+          ...new Set(operationalKinds.map((surface) => surface.kind)),
+        ].sort(),
+        candidate_api_count: (
+          candidatesByNetuid.get(subnet.netuid) || []
+        ).filter((candidate) =>
+          ["openapi", "subnet-api", "sse", "data-artifact"].includes(
+            candidate.kind,
+          ),
         ).length,
-        priority_score: operationalKinds.length * 20 + subnet.surface_count
+        priority_score: operationalKinds.length * 20 + subnet.surface_count,
       };
     })
-    .filter((candidate) => candidate.operational_surface_count > 0 || candidate.candidate_api_count > 0)
+    .filter(
+      (candidate) =>
+        candidate.operational_surface_count > 0 ||
+        candidate.candidate_api_count > 0,
+    )
     .sort((a, b) => b.priority_score - a.priority_score || a.netuid - b.netuid);
 
   return {
     schema_version: 1,
     contract_version: contractVersion,
     generated_at: generatedAt,
-    notes: "Backend curation review report. Machine-generated entries still need maintainer review before being treated as hand-curated truth.",
+    notes:
+      "Backend curation review report. Machine-generated entries still need maintainer review before being treated as hand-curated truth.",
     summary: {
       subnet_count: subnets.length,
-      needs_maintainer_review_count: subnets.filter((subnet) => subnet.curation.review_state !== "maintainer-reviewed").length,
+      needs_maintainer_review_count: subnets.filter(
+        (subnet) => subnet.curation.review_state !== "maintainer-reviewed",
+      ).length,
       maintainer_decision_count: reviewDecisionsDocument.decisions?.length || 0,
       adapter_candidate_count: adapterCandidates.length,
-      gap_kind_counts: countGapKinds(subnets)
+      gap_kind_counts: countGapKinds(subnets),
     },
     gap_priorities: gapPriorities,
     adapter_candidates: adapterCandidates,
-    review_decisions: reviewDecisionsDocument.decisions || []
+    review_decisions: reviewDecisionsDocument.decisions || [],
   };
 }
 
 function buildSchemaDriftPlaceholder(surfaces) {
-  const openapiSurfaces = surfaces.filter((surface) => surface.kind === "openapi");
+  const openapiSurfaces = surfaces.filter(
+    (surface) => surface.kind === "openapi",
+  );
   return {
     schema_version: 1,
     contract_version: contractVersion,
     generated_at: generatedAt,
     source: "artifact-build",
     status: "not-snapshotted",
-    notes: "Run npm run schemas:snapshot to fetch machine-readable OpenAPI/Swagger JSON and update drift status.",
+    notes:
+      "Run npm run schemas:snapshot to fetch machine-readable OpenAPI/Swagger JSON and update drift status.",
     openapi_surface_count: openapiSurfaces.length,
-    schema_backed_surface_count: openapiSurfaces.filter((surface) => surface.schema_url).length,
+    schema_backed_surface_count: openapiSurfaces.filter(
+      (surface) => surface.schema_url,
+    ).length,
     surfaces: openapiSurfaces.map((surface) => ({
       netuid: surface.netuid,
       subnet_slug: surface.subnet_slug,
       surface_id: surface.id,
       url: surface.url,
       schema_url: surface.schema_url || null,
-      status: surface.schema_url ? "pending-snapshot" : "ui-only-or-undiscovered"
-    }))
+      status: surface.schema_url
+        ? "pending-snapshot"
+        : "ui-only-or-undiscovered",
+    })),
   };
 }
 
@@ -689,7 +881,12 @@ function buildSearchIndex(subnets, surfacesForIndex, providerList) {
       subtitle: `SN${subnet.netuid} ${subnet.symbol || ""}`.trim(),
       url: `/subnets/${subnet.netuid}`,
       artifact_path: `/metagraph/subnets/${subnet.netuid}.json`,
-      tokens: compactTokens([subnet.name, subnet.slug, subnet.symbol, subnet.categories?.join(" ")])
+      tokens: compactTokens([
+        subnet.name,
+        subnet.slug,
+        subnet.symbol,
+        subnet.categories?.join(" "),
+      ]),
     })),
     ...surfacesForIndex.map((surface) => ({
       id: `surface:${surface.id}`,
@@ -700,7 +897,13 @@ function buildSearchIndex(subnets, surfacesForIndex, providerList) {
       subtitle: `${surface.kind} / ${surface.provider}`,
       url: surface.url,
       artifact_path: "/metagraph/surfaces.json",
-      tokens: compactTokens([surface.name, surface.kind, surface.provider, surface.subnet_name, surface.subnet_slug])
+      tokens: compactTokens([
+        surface.name,
+        surface.kind,
+        surface.provider,
+        surface.subnet_name,
+        surface.subnet_slug,
+      ]),
     })),
     ...providerList.map((provider) => ({
       id: `provider:${provider.id}`,
@@ -709,28 +912,54 @@ function buildSearchIndex(subnets, surfacesForIndex, providerList) {
       subtitle: provider.kind,
       url: provider.website_url,
       artifact_path: "/metagraph/providers.json",
-      tokens: compactTokens([provider.name, provider.id, provider.kind, provider.authority])
-    }))
-  ].sort((a, b) => a.type.localeCompare(b.type) || String(a.title).localeCompare(String(b.title)) || a.id.localeCompare(b.id));
+      tokens: compactTokens([
+        provider.name,
+        provider.id,
+        provider.kind,
+        provider.authority,
+      ]),
+    })),
+  ].sort(
+    (a, b) =>
+      a.type.localeCompare(b.type) ||
+      String(a.title).localeCompare(String(b.title)) ||
+      a.id.localeCompare(b.id),
+  );
 
   return {
     schema_version: 1,
     contract_version: contractVersion,
     generated_at: generatedAt,
     document_count: documents.length,
-    documents
+    documents,
   };
 }
 
 function compactTokens(values) {
-  return [...new Set(values.filter(Boolean).join(" ").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean))].sort();
+  return [
+    ...new Set(
+      values
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter(Boolean),
+    ),
+  ].sort();
 }
 
-function buildFreshnessArtifact({ adapterSnapshots: snapshots, generatedAt: timestamp, healthArtifacts: health, nativeSnapshot: native, schemaDrift, verification: verificationArtifact }) {
+function buildFreshnessArtifact({
+  adapterSnapshots: snapshots,
+  generatedAt: timestamp,
+  healthArtifacts: health,
+  nativeSnapshot: native,
+  schemaDrift,
+  verification: verificationArtifact,
+}) {
   const adapterRows = [...snapshots.values()].map((snapshot) => ({
     generated_at: snapshot.generated_at,
     slug: snapshot.slug,
-    status: snapshot.status
+    status: snapshot.status,
   }));
   return {
     schema_version: 1,
@@ -740,16 +969,42 @@ function buildFreshnessArtifact({ adapterSnapshots: snapshots, generatedAt: time
       adapter_count: adapterRows.length,
       health_surface_count: health.latest.surfaces.length,
       native_snapshot_captured_at: native.captured_at,
-      openapi_surface_count: schemaDrift.openapi_surface_count || schemaDrift.summary?.surface_count || 0,
-      verification_generated_at: verificationArtifact.generated_at || null
+      openapi_surface_count:
+        schemaDrift.openapi_surface_count ||
+        schemaDrift.summary?.surface_count ||
+        0,
+      verification_generated_at: verificationArtifact.generated_at || null,
     },
     sources: [
-      freshnessSource("native-subnets", native.captured_at, "registry/native/finney-subnets.json"),
-      freshnessSource("candidate-verification", verificationArtifact.generated_at || null, "registry/verification/latest.json"),
-      freshnessSource("surface-health", health.latest.generated_at, "public/metagraph/health/latest.json"),
-      freshnessSource("schema-drift", schemaDrift.generated_at, "public/metagraph/schema-drift.json"),
-      ...adapterRows.map((row) => freshnessSource(`adapter:${row.slug}`, row.generated_at, `registry/adapters/latest/${row.slug}.json`, row.status))
-    ].sort((a, b) => a.id.localeCompare(b.id))
+      freshnessSource(
+        "native-subnets",
+        native.captured_at,
+        "registry/native/finney-subnets.json",
+      ),
+      freshnessSource(
+        "candidate-verification",
+        verificationArtifact.generated_at || null,
+        "registry/verification/latest.json",
+      ),
+      freshnessSource(
+        "surface-health",
+        health.latest.generated_at,
+        "public/metagraph/health/latest.json",
+      ),
+      freshnessSource(
+        "schema-drift",
+        schemaDrift.generated_at,
+        "public/metagraph/schema-drift.json",
+      ),
+      ...adapterRows.map((row) =>
+        freshnessSource(
+          `adapter:${row.slug}`,
+          row.generated_at,
+          `registry/adapters/latest/${row.slug}.json`,
+          row.status,
+        ),
+      ),
+    ].sort((a, b) => a.id.localeCompare(b.id)),
   };
 }
 
@@ -759,38 +1014,63 @@ function freshnessSource(id, timestamp, pathValue, status = "captured") {
     path: pathValue,
     status,
     timestamp,
-    stale_after_hours: id === "native-subnets" ? 24 : 12
+    stale_after_hours: id === "native-subnets" ? 24 : 12,
   };
 }
 
-function buildSourceHealthArtifact({ candidates: candidateRows, providers: providerRows, rpcEndpoints: rpcArtifact, verification: verificationArtifact }) {
+function buildSourceHealthArtifact({
+  candidates: candidateRows,
+  providers: providerRows,
+  rpcEndpoints: rpcArtifact,
+  verification: verificationArtifact,
+}) {
   const verificationResults = verificationArtifact.results || [];
-  const candidatesByProvider = countBy(candidateRows, (candidate) => candidate.provider || "unknown");
-  const verificationByProvider = verificationResults.reduce((accumulator, result) => {
-    const candidate = candidateRows.find((row) => row.id === result.candidate_id);
-    const provider = candidate?.provider || "unknown";
-    const row = accumulator.get(provider) || { provider, classifications: {}, result_count: 0 };
-    row.result_count += 1;
-    row.classifications[result.classification || "unknown"] = (row.classifications[result.classification || "unknown"] || 0) + 1;
-    accumulator.set(provider, row);
-    return accumulator;
-  }, new Map());
+  const candidatesByProvider = countBy(
+    candidateRows,
+    (candidate) => candidate.provider || "unknown",
+  );
+  const verificationByProvider = verificationResults.reduce(
+    (accumulator, result) => {
+      const candidate = candidateRows.find(
+        (row) => row.id === result.candidate_id,
+      );
+      const provider = candidate?.provider || "unknown";
+      const row = accumulator.get(provider) || {
+        provider,
+        classifications: {},
+        result_count: 0,
+      };
+      row.result_count += 1;
+      row.classifications[result.classification || "unknown"] =
+        (row.classifications[result.classification || "unknown"] || 0) + 1;
+      accumulator.set(provider, row);
+      return accumulator;
+    },
+    new Map(),
+  );
 
-  const providers = providerRows.map((provider) => {
-    const verificationSummary = verificationByProvider.get(provider.id) || { classifications: {}, result_count: 0 };
-    const rpcCount = (rpcArtifact.endpoints || []).filter((endpoint) => endpoint.provider === provider.id).length;
-    return {
-      id: provider.id,
-      name: provider.name,
-      kind: provider.kind,
-      authority: provider.authority,
-      candidate_count: candidatesByProvider[provider.id] || 0,
-      verification_result_count: verificationSummary.result_count,
-      classifications: verificationSummary.classifications,
-      rpc_endpoint_count: rpcCount,
-      status: sourceStatus(verificationSummary.classifications, rpcCount)
-    };
-  }).sort((a, b) => a.id.localeCompare(b.id));
+  const providers = providerRows
+    .map((provider) => {
+      const verificationSummary = verificationByProvider.get(provider.id) || {
+        classifications: {},
+        result_count: 0,
+      };
+      const rpcCount = (rpcArtifact.endpoints || []).filter(
+        (endpoint) => endpoint.provider === provider.id,
+      ).length;
+      return {
+        id: provider.id,
+        name: provider.name,
+        kind: provider.kind,
+        authority: provider.authority,
+        candidate_count: candidatesByProvider[provider.id] || 0,
+        verification_result_count: verificationSummary.result_count,
+        classifications: verificationSummary.classifications,
+        rpc_endpoint_count: rpcCount,
+        status: sourceStatus(verificationSummary.classifications, rpcCount),
+      };
+    })
+    .sort((a, b) => a.id.localeCompare(b.id));
 
   return {
     schema_version: 1,
@@ -802,15 +1082,18 @@ function buildSourceHealthArtifact({ candidates: candidateRows, providers: provi
       candidate_count: candidateRows.length,
       verification_result_count: verificationResults.length,
       rpc_endpoint_count: rpcArtifact.endpoints?.length || 0,
-      status_counts: countBy(providers, "status")
+      status_counts: countBy(providers, "status"),
     },
-    providers
+    providers,
   };
 }
 
 function sourceStatus(classifications, rpcCount) {
   const live = (classifications.live || 0) + (classifications.redirected || 0);
-  const degraded = (classifications["rate-limited"] || 0) + (classifications.transient || 0) + (classifications.timeout || 0);
+  const degraded =
+    (classifications["rate-limited"] || 0) +
+    (classifications.transient || 0) +
+    (classifications.timeout || 0);
   const dead = (classifications.dead || 0) + (classifications.unsafe || 0);
   if (live > 0 || rpcCount > 0) {
     return degraded > live ? "degraded" : "ok";
@@ -824,56 +1107,75 @@ function sourceStatus(classifications, rpcCount) {
   return "unknown";
 }
 
-function buildEvidenceLedger({ candidates: candidateRows, generatedAt: timestamp, subnets, surfaces: surfaceRows }) {
+function buildEvidenceLedger({
+  candidates: candidateRows,
+  generatedAt: timestamp,
+  subnets,
+  surfaces: surfaceRows,
+}) {
   const subnetClaims = subnets.map((subnet) => ({
     claim: `SN${subnet.netuid} is an active ${subnet.subnet_type} netuid on Finney.`,
     confidence: "high",
-    limits: "Native chain state is canonical for active existence only; off-chain interfaces come from overlays and candidates.",
+    limits:
+      "Native chain state is canonical for active existence only; off-chain interfaces come from overlays and candidates.",
     source_tier: "native-chain",
     source_type: "bittensor-sdk",
     source_url: "registry/native/finney-subnets.json",
     subject: `subnet:${subnet.netuid}`,
     support_summary: `Captured from native snapshot at block ${subnet.block}.`,
-    verified_at: timestamp
+    verified_at: timestamp,
   }));
 
   const surfaceClaims = surfaceRows.map((surface) => ({
     claim: `${surface.name} is a public ${surface.kind} surface for SN${surface.netuid}.`,
-    confidence: surface.authority === "official" ? "high" : surface.authority === "registry-observed" ? "medium" : "medium",
-    limits: surface.auth_required ? "Surface is public metadata but requires authentication for access." : "Surface was recorded as public-safe; availability is tracked by health probes.",
-    source_tier: surface.authority === "official" ? "provider-claimed" : "community-docs",
+    confidence:
+      surface.authority === "official"
+        ? "high"
+        : surface.authority === "registry-observed"
+          ? "medium"
+          : "medium",
+    limits: surface.auth_required
+      ? "Surface is public metadata but requires authentication for access."
+      : "Surface was recorded as public-safe; availability is tracked by health probes.",
+    source_tier:
+      surface.authority === "official" ? "provider-claimed" : "community-docs",
     source_type: surface.authority,
     source_url: surface.source_urls?.[0] || surface.url,
     subject: `surface:${surface.id}`,
     support_summary: `Listed in curated overlay for ${surface.subnet_slug}.`,
-    verified_at: surface.verification?.verified_at || timestamp
+    verified_at: surface.verification?.verified_at || timestamp,
   }));
 
   const candidateClaims = candidateRows.slice(0, 250).map((candidate) => ({
     claim: `${candidate.name} is a candidate ${candidate.kind} surface for SN${candidate.netuid}.`,
     confidence: candidate.confidence || "low",
-    limits: "Candidate records are discovery leads and are not promoted registry truth until verification and maintainer review.",
+    limits:
+      "Candidate records are discovery leads and are not promoted registry truth until verification and maintainer review.",
     source_tier: candidate.source_tier || "community-docs",
     source_type: candidate.source_type || "candidate-discovery",
     source_url: candidate.source_url,
     subject: `candidate:${candidate.id}`,
-    support_summary: candidate.review_notes || "Discovered from public source metadata.",
-    verified_at: candidate.verification?.verified_at || timestamp
+    support_summary:
+      candidate.review_notes || "Discovered from public source metadata.",
+    verified_at: candidate.verification?.verified_at || timestamp,
   }));
 
-  const claims = [...subnetClaims, ...surfaceClaims, ...candidateClaims].sort((a, b) => a.subject.localeCompare(b.subject));
+  const claims = [...subnetClaims, ...surfaceClaims, ...candidateClaims].sort(
+    (a, b) => a.subject.localeCompare(b.subject),
+  );
   return {
     schema_version: 1,
     contract_version: contractVersion,
     generated_at: timestamp,
-    notes: "Evidence ledger uses public source URLs and generated registry provenance only. Candidate entries are capped to keep the public artifact compact.",
+    notes:
+      "Evidence ledger uses public source URLs and generated registry provenance only. Candidate entries are capped to keep the public artifact compact.",
     summary: {
       candidate_claim_count: candidateClaims.length,
       claim_count: claims.length,
       subnet_claim_count: subnetClaims.length,
-      surface_claim_count: surfaceClaims.length
+      surface_claim_count: surfaceClaims.length,
     },
-    claims
+    claims,
   };
 }
 
@@ -885,7 +1187,7 @@ function buildR2Manifest({ artifactSizes, generatedAt: timestamp }) {
     latest_key: `latest/${artifact.path}`,
     path: `/metagraph/${artifact.path}`,
     sha256: artifact.sha256,
-    size_bytes: artifact.size_bytes
+    size_bytes: artifact.size_bytes,
   }));
   return {
     schema_version: 1,
@@ -897,43 +1199,105 @@ function buildR2Manifest({ artifactSizes, generatedAt: timestamp }) {
       canonical_latest_in_repo: true,
       large_history_in_r2: true,
       source_of_truth: "github-reviewed-artifacts",
-      versioned_run_prefix: `runs/${version}/`
+      versioned_run_prefix: `runs/${version}/`,
     },
     latest_prefix: "latest/",
     run_prefix: `runs/${version}/`,
     artifact_count: artifacts.length,
-    artifact_size_bytes: artifacts.reduce((sum, artifact) => sum + artifact.size_bytes, 0),
-    artifacts
+    artifact_size_bytes: artifacts.reduce(
+      (sum, artifact) => sum + artifact.size_bytes,
+      0,
+    ),
+    artifacts,
   };
 }
 
-async function buildSourceSnapshots({ adapterSnapshots: snapshots, candidates: candidateRows, generatedAt: timestamp, nativeSnapshot: native, overlays: subnetOverlays, providers: providerRows, reviewDecisions: decisions, verification: verificationArtifact }) {
+async function buildSourceSnapshots({
+  adapterSnapshots: snapshots,
+  candidates: candidateRows,
+  generatedAt: timestamp,
+  nativeSnapshot: native,
+  overlays: subnetOverlays,
+  providers: providerRows,
+  reviewDecisions: decisions,
+  verification: verificationArtifact,
+}) {
   const sourceRows = [
-    sourceSnapshot("native-subnets", "native-chain", "registry/native/finney-subnets.json", native, native.subnets?.length || 0, native.captured_at),
-    sourceSnapshot("providers", "registry-manifest", "registry/providers", providerRows, providerRows.length, timestamp),
-    sourceSnapshot("subnet-overlays", "registry-manifest", "registry/subnets", subnetOverlays, subnetOverlays.length, timestamp),
-    sourceSnapshot("candidate-surfaces", "candidate-discovery", "registry/candidates", candidateRows, candidateRows.length, timestamp),
-    sourceSnapshot("candidate-verification", "probe-results", "registry/verification/latest.json", verificationArtifact, verificationArtifact.results?.length || 0, verificationArtifact.generated_at || timestamp),
-    sourceSnapshot("maintainer-decisions", "review-ledger", "registry/reviews/maintainer-reviewed.json", decisions, decisions.decisions?.length || 0, decisions.generated_at || timestamp),
+    sourceSnapshot(
+      "native-subnets",
+      "native-chain",
+      "registry/native/finney-subnets.json",
+      native,
+      native.subnets?.length || 0,
+      native.captured_at,
+    ),
+    sourceSnapshot(
+      "providers",
+      "registry-manifest",
+      "registry/providers",
+      providerRows,
+      providerRows.length,
+      timestamp,
+    ),
+    sourceSnapshot(
+      "subnet-overlays",
+      "registry-manifest",
+      "registry/subnets",
+      subnetOverlays,
+      subnetOverlays.length,
+      timestamp,
+    ),
+    sourceSnapshot(
+      "candidate-surfaces",
+      "candidate-discovery",
+      "registry/candidates",
+      candidateRows,
+      candidateRows.length,
+      timestamp,
+    ),
+    sourceSnapshot(
+      "candidate-verification",
+      "probe-results",
+      "registry/verification/latest.json",
+      verificationArtifact,
+      verificationArtifact.results?.length || 0,
+      verificationArtifact.generated_at || timestamp,
+    ),
+    sourceSnapshot(
+      "maintainer-decisions",
+      "review-ledger",
+      "registry/reviews/maintainer-reviewed.json",
+      decisions,
+      decisions.decisions?.length || 0,
+      decisions.generated_at || timestamp,
+    ),
     ...[...snapshots.entries()].map(([slug, snapshot]) =>
-      sourceSnapshot(`adapter:${slug}`, "adapter-snapshot", `registry/adapters/latest/${slug}.json`, snapshot, Object.keys(snapshot.dimensions || {}).length, snapshot.generated_at || timestamp)
-    )
+      sourceSnapshot(
+        `adapter:${slug}`,
+        "adapter-snapshot",
+        `registry/adapters/latest/${slug}.json`,
+        snapshot,
+        Object.keys(snapshot.dimensions || {}).length,
+        snapshot.generated_at || timestamp,
+      ),
+    ),
   ].sort((a, b) => a.id.localeCompare(b.id));
 
   return {
     schema_version: 1,
     contract_version: contractVersion,
     generated_at: timestamp,
-    notes: "Compact source-input hashes for public artifact reproducibility. These are not raw private snapshots and contain no secrets or credentialed data.",
+    notes:
+      "Compact source-input hashes for public artifact reproducibility. These are not raw private snapshots and contain no secrets or credentialed data.",
     summary: {
       source_count: sourceRows.length,
       provider_count: providerRows.length,
       overlay_count: subnetOverlays.length,
       candidate_count: candidateRows.length,
       verification_result_count: verificationArtifact.results?.length || 0,
-      adapter_snapshot_count: snapshots.size
+      adapter_snapshot_count: snapshots.size,
     },
-    sources: sourceRows
+    sources: sourceRows,
   };
 }
 
@@ -944,28 +1308,59 @@ function sourceSnapshot(id, kind, sourcePath, value, recordCount, capturedAt) {
     path: sourcePath,
     captured_at: capturedAt || null,
     record_count: recordCount,
-    hash: hashJson(value)
+    hash: hashJson(value),
   };
 }
 
-function buildChangelog({ currentArtifacts, currentCoverage, currentSubnets, generatedAt: timestamp, previousArtifacts, previousCoverage, previousSubnets }) {
-  const previousMap = new Map(previousArtifacts.map((artifact) => [artifact.path, artifact]));
-  const currentMap = new Map(currentArtifacts.map((artifact) => [artifact.path, artifact]));
-  const addedArtifacts = currentArtifacts.filter((artifact) => !previousMap.has(artifact.path));
-  const removedArtifacts = previousArtifacts.filter((artifact) => !currentMap.has(artifact.path));
+function buildChangelog({
+  currentArtifacts,
+  currentCoverage,
+  currentSubnets,
+  generatedAt: timestamp,
+  previousArtifacts,
+  previousCoverage,
+  previousSubnets,
+}) {
+  const previousMap = new Map(
+    previousArtifacts.map((artifact) => [artifact.path, artifact]),
+  );
+  const currentMap = new Map(
+    currentArtifacts.map((artifact) => [artifact.path, artifact]),
+  );
+  const addedArtifacts = currentArtifacts.filter(
+    (artifact) => !previousMap.has(artifact.path),
+  );
+  const removedArtifacts = previousArtifacts.filter(
+    (artifact) => !currentMap.has(artifact.path),
+  );
   const modifiedArtifacts = currentArtifacts.filter((artifact) => {
     const previous = previousMap.get(artifact.path);
     return previous && previous.hash !== artifact.hash;
   });
 
-  const subnetChanges = diffSubnets(previousSubnets?.subnets || [], currentSubnets.subnets || []);
+  const subnetChanges = diffSubnets(
+    previousSubnets?.subnets || [],
+    currentSubnets.subnets || [],
+  );
   const coverageDelta = previousCoverage
     ? {
-        candidate_count: delta(previousCoverage.candidate_count, currentCoverage.candidate_count),
-        curated_overlay_count: delta(previousCoverage.curated_overlay_count, currentCoverage.curated_overlay_count),
-        native_only_count: delta(previousCoverage.native_only_count, currentCoverage.native_only_count),
+        candidate_count: delta(
+          previousCoverage.candidate_count,
+          currentCoverage.candidate_count,
+        ),
+        curated_overlay_count: delta(
+          previousCoverage.curated_overlay_count,
+          currentCoverage.curated_overlay_count,
+        ),
+        native_only_count: delta(
+          previousCoverage.native_only_count,
+          currentCoverage.native_only_count,
+        ),
         provider_count: null,
-        surface_count: delta(previousCoverage.surface_count, currentCoverage.surface_count)
+        surface_count: delta(
+          previousCoverage.surface_count,
+          currentCoverage.surface_count,
+        ),
       }
     : null;
 
@@ -976,7 +1371,7 @@ function buildChangelog({ currentArtifacts, currentCoverage, currentSubnets, gen
     source: "generated-artifact-diff",
     notes: [
       "This changelog compares the latest generated artifacts against the previous checked-in public artifact state before the build.",
-      "Long-term historical runs are expected to live in R2 under versioned prefixes."
+      "Long-term historical runs are expected to live in R2 under versioned prefixes.",
     ],
     summary: {
       artifact_added_count: addedArtifacts.length,
@@ -985,32 +1380,48 @@ function buildChangelog({ currentArtifacts, currentCoverage, currentSubnets, gen
       netuid_added_count: subnetChanges.added.length,
       netuid_removed_count: subnetChanges.removed.length,
       netuid_renamed_count: subnetChanges.renamed.length,
-      coverage_delta: coverageDelta
+      coverage_delta: coverageDelta,
     },
     artifacts: {
       added: addedArtifacts.slice(0, 250),
       modified: modifiedArtifacts.slice(0, 250),
-      removed: removedArtifacts.slice(0, 250)
+      removed: removedArtifacts.slice(0, 250),
     },
-    subnets: subnetChanges
+    subnets: subnetChanges,
   };
 }
 
 function diffSubnets(previousSubnets, currentSubnets) {
-  const previousByNetuid = new Map(previousSubnets.map((subnet) => [subnet.netuid, subnet]));
-  const currentByNetuid = new Map(currentSubnets.map((subnet) => [subnet.netuid, subnet]));
+  const previousByNetuid = new Map(
+    previousSubnets.map((subnet) => [subnet.netuid, subnet]),
+  );
+  const currentByNetuid = new Map(
+    currentSubnets.map((subnet) => [subnet.netuid, subnet]),
+  );
   const added = currentSubnets
     .filter((subnet) => !previousByNetuid.has(subnet.netuid))
-    .map((subnet) => ({ netuid: subnet.netuid, name: subnet.name, slug: subnet.slug }));
+    .map((subnet) => ({
+      netuid: subnet.netuid,
+      name: subnet.name,
+      slug: subnet.slug,
+    }));
   const removed = previousSubnets
     .filter((subnet) => !currentByNetuid.has(subnet.netuid))
-    .map((subnet) => ({ netuid: subnet.netuid, name: subnet.name, slug: subnet.slug }));
+    .map((subnet) => ({
+      netuid: subnet.netuid,
+      name: subnet.name,
+      slug: subnet.slug,
+    }));
   const renamed = currentSubnets
-    .filter((subnet) => previousByNetuid.has(subnet.netuid) && previousByNetuid.get(subnet.netuid).name !== subnet.name)
+    .filter(
+      (subnet) =>
+        previousByNetuid.has(subnet.netuid) &&
+        previousByNetuid.get(subnet.netuid).name !== subnet.name,
+    )
     .map((subnet) => ({
       netuid: subnet.netuid,
       before: previousByNetuid.get(subnet.netuid).name,
-      after: subnet.name
+      after: subnet.name,
     }));
 
   return { added, removed, renamed };
@@ -1023,7 +1434,7 @@ function delta(before, after) {
   return {
     before,
     after,
-    delta: after - before
+    delta: after - before,
   };
 }
 
@@ -1035,13 +1446,17 @@ async function collectArtifactDigests(root) {
         return;
       }
       const relativePath = path.relative(root, filePath).replace(/\\/g, "/");
-      if (["build-summary.json", "changelog.json", "r2-manifest.json"].includes(relativePath)) {
+      if (
+        ["build-summary.json", "changelog.json", "r2-manifest.json"].includes(
+          relativePath,
+        )
+      ) {
         return;
       }
       const value = await readJson(filePath);
       files.push({
         path: relativePath,
-        hash: hashJson(value)
+        hash: hashJson(value),
       });
     });
   } catch (error) {
@@ -1078,27 +1493,31 @@ async function collectArtifactSizes(root) {
     files.push({
       path: relativePath,
       sha256: sha256Hex(raw),
-      size_bytes: stat.size
+      size_bytes: stat.size,
     });
   });
   return files.sort((a, b) => a.path.localeCompare(b.path));
 }
 
 async function loadAdapterSnapshots() {
-  const files = await listJsonFilesRecursive(path.join(repoRoot, "registry/adapters/latest"));
+  const files = await listJsonFilesRecursive(
+    path.join(repoRoot, "registry/adapters/latest"),
+  );
   const snapshots = await Promise.all(files.map(readJson));
   return new Map(snapshots.map((snapshot) => [snapshot.slug, snapshot]));
 }
 
 async function loadReviewDecisions() {
   try {
-    return await readJson(path.join(repoRoot, "registry/reviews/maintainer-reviewed.json"));
+    return await readJson(
+      path.join(repoRoot, "registry/reviews/maintainer-reviewed.json"),
+    );
   } catch (error) {
     if (error.code === "ENOENT") {
       return {
         schema_version: 1,
         generated_at: generatedAt,
-        decisions: []
+        decisions: [],
       };
     }
     throw error;
@@ -1119,20 +1538,41 @@ async function walk(dirPath, onFile) {
 
 function reviewPriorityScore(subnet, surfacesForSubnet, candidatesForSubnet) {
   const missingKinds = subnet.gaps.missing_kinds || [];
-  const highValueMissing = missingKinds.filter((kind) => ["source-repo", "docs", "website", "openapi", "subnet-api"].includes(kind));
-  const adapterBonus = surfacesForSubnet.filter((surface) => ["openapi", "subnet-api", "sse", "data-artifact"].includes(surface.kind)).length * 8;
-  const machineReviewPenalty = subnet.curation.review_state === "maintainer-reviewed" ? -25 : 20;
-  return highValueMissing.length * 12 + candidatesForSubnet.length + adapterBonus + machineReviewPenalty;
+  const highValueMissing = missingKinds.filter((kind) =>
+    ["source-repo", "docs", "website", "openapi", "subnet-api"].includes(kind),
+  );
+  const adapterBonus =
+    surfacesForSubnet.filter((surface) =>
+      ["openapi", "subnet-api", "sse", "data-artifact"].includes(surface.kind),
+    ).length * 8;
+  const machineReviewPenalty =
+    subnet.curation.review_state === "maintainer-reviewed" ? -25 : 20;
+  return (
+    highValueMissing.length * 12 +
+    candidatesForSubnet.length +
+    adapterBonus +
+    machineReviewPenalty
+  );
 }
 
 function suggestedReviewAction(subnet, surfacesForSubnet, candidatesForSubnet) {
-  if (subnet.curation.review_state !== "maintainer-reviewed" && surfacesForSubnet.length > 0) {
+  if (
+    subnet.curation.review_state !== "maintainer-reviewed" &&
+    surfacesForSubnet.length > 0
+  ) {
     return "review promoted surfaces and mark maintainer-reviewed where provenance is strong";
   }
-  if ((subnet.gaps.missing_kinds || []).includes("source-repo") && candidatesForSubnet.length > 0) {
+  if (
+    (subnet.gaps.missing_kinds || []).includes("source-repo") &&
+    candidatesForSubnet.length > 0
+  ) {
     return "inspect source-repo/docs candidates for official provenance";
   }
-  if (surfacesForSubnet.some((surface) => ["openapi", "subnet-api", "sse"].includes(surface.kind))) {
+  if (
+    surfacesForSubnet.some((surface) =>
+      ["openapi", "subnet-api", "sse"].includes(surface.kind),
+    )
+  ) {
     return "evaluate for subnet-specific adapter";
   }
   return "keep baseline entry and wait for public-source or community intake";
@@ -1146,12 +1586,18 @@ function countGapKinds(subnets) {
           accumulator[kind] = (accumulator[kind] || 0) + 1;
         }
         return accumulator;
-      }, {})
-    ).sort(([a], [b]) => a.localeCompare(b))
+      }, {}),
+    ).sort(([a], [b]) => a.localeCompare(b)),
   );
 }
 
-function classifySubnetStatus({ okCount, failedCount, unknownCount, degradedCount, surfaceCount }) {
+function classifySubnetStatus({
+  okCount,
+  failedCount,
+  unknownCount,
+  degradedCount,
+  surfaceCount,
+}) {
   if (surfaceCount === 0 || unknownCount === surfaceCount) {
     return "unknown";
   }
@@ -1170,7 +1616,7 @@ function badgeColor(status) {
       ok: "brightgreen",
       degraded: "yellow",
       failed: "red",
-      unknown: "lightgrey"
+      unknown: "lightgrey",
     }[status] || "lightgrey"
   );
 }
@@ -1183,5 +1629,7 @@ function average(values) {
   if (values.length === 0) {
     return null;
   }
-  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+  return Math.round(
+    values.reduce((sum, value) => sum + value, 0) / values.length,
+  );
 }

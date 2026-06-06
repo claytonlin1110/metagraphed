@@ -1,0 +1,8 @@
+node_modules
+public/metagraph
+registry/native
+registry/candidates/generated
+registry/subnets/generated
+registry/verification
+registry/adapters/latest
+tmp

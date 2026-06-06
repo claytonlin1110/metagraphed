@@ -4,11 +4,7 @@
   "name": "root",
   "slug": "root",
   "status": "active",
-  "categories": [
-    "root",
-    "system",
-    "chain-rpc"
-  ],
+  "categories": ["root", "system", "chain-rpc"],
   "docs_url": "https://docs.learnbittensor.org/concepts/bittensor-networks",
   "source_repo": "https://github.com/opentensor/subtensor",
   "dashboard_url": "https://taomarketcap.com/subnets/0",
@@ -158,9 +154,7 @@
       "auth_required": false,
       "authority": "provider-claimed",
       "public_safe": true,
-      "source_urls": [
-        "https://onfinality.io/en/networks/bittensor-finney"
-      ],
+      "source_urls": ["https://onfinality.io/en/networks/bittensor-finney"],
       "rate_limit_notes": "Provider states the public endpoint is rate limited and suitable for testing.",
       "probe": {
         "enabled": true,
@@ -178,9 +172,7 @@
       "auth_required": false,
       "authority": "provider-claimed",
       "public_safe": true,
-      "source_urls": [
-        "https://onfinality.io/en/networks/bittensor-finney"
-      ],
+      "source_urls": ["https://onfinality.io/en/networks/bittensor-finney"],
       "rate_limit_notes": "Provider states the public endpoint is rate limited and suitable for testing.",
       "probe": {
         "enabled": true,
@@ -239,9 +231,7 @@
       "auth_required": false,
       "authority": "provider-claimed",
       "public_safe": true,
-      "source_urls": [
-        "https://api.taomarketcap.com/public/v1/subnets/0"
-      ],
+      "source_urls": ["https://api.taomarketcap.com/public/v1/subnets/0"],
       "notes": "Third-party dashboard enrichment, not protocol authority.",
       "probe": {
         "enabled": true,

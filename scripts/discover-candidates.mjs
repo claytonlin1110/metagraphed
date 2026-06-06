@@ -6,14 +6,16 @@ import {
   repoRoot,
   slugify,
   stableStringify,
-  writeJson
+  writeJson,
 } from "./lib.mjs";
 
 const args = new Set(process.argv.slice(2));
 const shouldWrite = args.has("--write");
 const dryRun = args.has("--dry-run") || !shouldWrite;
 const nativeSnapshot = await loadNativeSnapshot();
-const nativeByNetuid = new Map(nativeSnapshot.subnets.map((subnet) => [subnet.netuid, subnet]));
+const nativeByNetuid = new Map(
+  nativeSnapshot.subnets.map((subnet) => [subnet.netuid, subnet]),
+);
 const candidatesByKey = new Map();
 const candidateIds = new Set();
 const warnings = [];
@@ -30,51 +32,59 @@ if (restoredProviders.size === 0) {
 }
 
 const candidates = [...candidatesByKey.values()].sort(
-  (a, b) => a.netuid - b.netuid || a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id)
+  (a, b) =>
+    a.netuid - b.netuid ||
+    a.kind.localeCompare(b.kind) ||
+    a.id.localeCompare(b.id),
 );
 
 const summary = {
   mode: dryRun ? "dry-run" : "write",
   native_subnet_count: nativeSnapshot.subnets.length,
   generated_candidate_count: candidates.length,
-  candidate_subnet_count: new Set(candidates.map((candidate) => candidate.netuid)).size,
+  candidate_subnet_count: new Set(
+    candidates.map((candidate) => candidate.netuid),
+  ).size,
   by_provider: countBy(candidates, "provider"),
   by_kind: countBy(candidates, "kind"),
-  warnings
+  warnings,
 };
 
 if (!dryRun) {
-  await writeJson(path.join(repoRoot, "registry/candidates/generated/public-sources.json"), {
-    schema_version: 1,
-    generated_by: "metagraphed-discover-candidates",
-    generated_at: buildTimestamp(),
-    native_snapshot_captured_at: nativeSnapshot.captured_at,
-    notes:
-      "Generated candidate surfaces from public sources. These are not verified registry surfaces until maintainer review promotes them into registry/subnets.",
-    sources: [
-      {
-        id: "taomarketcap",
-        url: "https://api.taomarketcap.com/public/v1/subnets/"
-      },
-      {
-        id: "tensorplex-subnet-docs",
-        url: "https://github.com/tensorplex-labs/subnet-docs"
-      },
-      {
-        id: "taopedia-articles",
-        url: "https://github.com/e35ventura/taopedia-articles"
-      },
-      {
-        id: "github-readme-links",
-        url: "https://github.com"
-      },
-      {
-        id: "project-website-links",
-        url: "https://metagraph.sh"
-      }
-    ],
-    candidates
-  });
+  await writeJson(
+    path.join(repoRoot, "registry/candidates/generated/public-sources.json"),
+    {
+      schema_version: 1,
+      generated_by: "metagraphed-discover-candidates",
+      generated_at: buildTimestamp(),
+      native_snapshot_captured_at: nativeSnapshot.captured_at,
+      notes:
+        "Generated candidate surfaces from public sources. These are not verified registry surfaces until maintainer review promotes them into registry/subnets.",
+      sources: [
+        {
+          id: "taomarketcap",
+          url: "https://api.taomarketcap.com/public/v1/subnets/",
+        },
+        {
+          id: "tensorplex-subnet-docs",
+          url: "https://github.com/tensorplex-labs/subnet-docs",
+        },
+        {
+          id: "taopedia-articles",
+          url: "https://github.com/e35ventura/taopedia-articles",
+        },
+        {
+          id: "github-readme-links",
+          url: "https://github.com",
+        },
+        {
+          id: "project-website-links",
+          url: "https://metagraph.sh",
+        },
+      ],
+      candidates,
+    },
+  );
 }
 
 console.log(stableStringify(summary));
@@ -94,7 +104,9 @@ async function discoverFromTaoMarketCap() {
       return;
     }
 
-    expectedCount = Number.isInteger(page.count) ? page.count : offset + (page.results || []).length;
+    expectedCount = Number.isInteger(page.count)
+      ? page.count
+      : offset + (page.results || []).length;
     for (const subnet of page.results || []) {
       const netuid = Number(subnet.netuid);
       if (!nativeByNetuid.has(netuid) || subnet.is_active === false) {
@@ -107,7 +119,8 @@ async function discoverFromTaoMarketCap() {
       }
 
       const sourceUrl = `https://api.taomarketcap.com/public/v1/subnets/${netuid}/`;
-      const displayName = cleanName(identity.subnetName) || nativeByNetuid.get(netuid).name;
+      const displayName =
+        cleanName(identity.subnetName) || nativeByNetuid.get(netuid).name;
 
       for (const url of extractUrls(identity.subnetUrl)) {
         addCandidate({
@@ -121,7 +134,8 @@ async function discoverFromTaoMarketCap() {
           source_tier: "third-party-index",
           confidence: "medium",
           provider: "taomarketcap",
-          review_notes: "Discovered from TaoMarketCap subnet identity metadata. Not probed or verified by Metagraphed."
+          review_notes:
+            "Discovered from TaoMarketCap subnet identity metadata. Not probed or verified by Metagraphed.",
         });
       }
 
@@ -137,7 +151,8 @@ async function discoverFromTaoMarketCap() {
           source_tier: "third-party-index",
           confidence: "medium",
           provider: "taomarketcap",
-          review_notes: "Discovered from TaoMarketCap subnet identity metadata. Not probed or verified by Metagraphed."
+          review_notes:
+            "Discovered from TaoMarketCap subnet identity metadata. Not probed or verified by Metagraphed.",
         });
       }
     }
@@ -150,7 +165,8 @@ async function discoverFromTaoMarketCap() {
 }
 
 async function discoverFromTensorplexSubnetDocs() {
-  const dataRootUrl = "https://api.github.com/repos/tensorplex-labs/subnet-docs/contents/data?ref=main";
+  const dataRootUrl =
+    "https://api.github.com/repos/tensorplex-labs/subnet-docs/contents/data?ref=main";
   const entries = await fetchJson(dataRootUrl, githubHeaders());
   if (!Array.isArray(entries)) {
     warnings.push("tensorplex-subnet-docs: failed to list data directories");
@@ -162,95 +178,104 @@ async function discoverFromTensorplexSubnetDocs() {
     entries
       .filter((entry) => entry.type === "dir" && /^\d+$/.test(entry.name))
       .map((entry) => Number(entry.name))
-      .filter((netuid) => nativeByNetuid.has(netuid))
+      .filter((netuid) => nativeByNetuid.has(netuid)),
   );
 
-  await mapLimit([...availableNetuids].sort((a, b) => a - b), 8, async (netuid) => {
-    const rawUrl = `https://raw.githubusercontent.com/tensorplex-labs/subnet-docs/main/data/${netuid}/subnet.json`;
-    const repoUrl = `https://github.com/tensorplex-labs/subnet-docs/blob/main/data/${netuid}/subnet.json`;
-    const directoryUrl = `https://github.com/tensorplex-labs/subnet-docs/tree/main/data/${netuid}`;
-    const document = await fetchJson(rawUrl);
-    if (!document) {
-      return;
-    }
-
-    const nativeName = nativeByNetuid.get(netuid).name;
-    const displayName = cleanName(document.name) || nativeName;
-    addCandidate({
-      id: `sn-${netuid}-tensorplex-docs`,
-      netuid,
-      name: `${displayName} Tensorplex subnet docs`,
-      kind: "docs",
-      url: directoryUrl,
-      source_url: repoUrl,
-      source_type: "tensorplex-subnet-docs",
-      source_tier: "community-docs",
-      confidence: "medium",
-      provider: "tensorplex-subnet-docs",
-      review_notes: "Discovered from Tensorplex subnet-docs. Useful as documentation enrichment, not verified operational authority."
-    });
-
-    for (const [index, rawUrlValue] of arrayFrom(document.github).entries()) {
-      for (const url of extractUrls(rawUrlValue)) {
-        addCandidate({
-          id: `sn-${netuid}-tensorplex-source-repo-${index + 1}`,
-          netuid,
-          name: `${displayName} source repository`,
-          kind: "source-repo",
-          url,
-          source_url: repoUrl,
-          source_type: "tensorplex-subnet-docs-github",
-          source_tier: "community-docs",
-          confidence: "medium",
-          provider: "tensorplex-subnet-docs",
-          review_notes: "Discovered from Tensorplex subnet-docs. Not probed or verified by Metagraphed."
-        });
+  await mapLimit(
+    [...availableNetuids].sort((a, b) => a - b),
+    8,
+    async (netuid) => {
+      const rawUrl = `https://raw.githubusercontent.com/tensorplex-labs/subnet-docs/main/data/${netuid}/subnet.json`;
+      const repoUrl = `https://github.com/tensorplex-labs/subnet-docs/blob/main/data/${netuid}/subnet.json`;
+      const directoryUrl = `https://github.com/tensorplex-labs/subnet-docs/tree/main/data/${netuid}`;
+      const document = await fetchJson(rawUrl);
+      if (!document) {
+        return;
       }
-    }
 
-    for (const url of extractUrls(document.hw_requirements)) {
+      const nativeName = nativeByNetuid.get(netuid).name;
+      const displayName = cleanName(document.name) || nativeName;
       addCandidate({
-        id: `sn-${netuid}-tensorplex-hardware-docs`,
+        id: `sn-${netuid}-tensorplex-docs`,
         netuid,
-        name: `${displayName} hardware requirements`,
+        name: `${displayName} Tensorplex subnet docs`,
         kind: "docs",
-        url,
+        url: directoryUrl,
         source_url: repoUrl,
-        source_type: "tensorplex-subnet-docs-hardware",
+        source_type: "tensorplex-subnet-docs",
         source_tier: "community-docs",
-        confidence: "low",
+        confidence: "medium",
         provider: "tensorplex-subnet-docs",
-        review_notes: "Discovered from Tensorplex subnet-docs hardware requirements metadata."
+        review_notes:
+          "Discovered from Tensorplex subnet-docs. Useful as documentation enrichment, not verified operational authority.",
       });
-    }
 
-    for (const [index, website] of arrayFrom(document.websites).entries()) {
-      const kind = surfaceKindForWebsiteLabel(website?.label);
-      if (!kind) {
-        continue;
+      for (const [index, rawUrlValue] of arrayFrom(document.github).entries()) {
+        for (const url of extractUrls(rawUrlValue)) {
+          addCandidate({
+            id: `sn-${netuid}-tensorplex-source-repo-${index + 1}`,
+            netuid,
+            name: `${displayName} source repository`,
+            kind: "source-repo",
+            url,
+            source_url: repoUrl,
+            source_type: "tensorplex-subnet-docs-github",
+            source_tier: "community-docs",
+            confidence: "medium",
+            provider: "tensorplex-subnet-docs",
+            review_notes:
+              "Discovered from Tensorplex subnet-docs. Not probed or verified by Metagraphed.",
+          });
+        }
       }
-      for (const url of extractUrls(website?.url)) {
-        const label = slugify(website?.label || "website") || "website";
+
+      for (const url of extractUrls(document.hw_requirements)) {
         addCandidate({
-          id: `sn-${netuid}-tensorplex-${label}-${index + 1}`,
+          id: `sn-${netuid}-tensorplex-hardware-docs`,
           netuid,
-          name: `${displayName} ${website?.label || "website"}`,
-          kind,
+          name: `${displayName} hardware requirements`,
+          kind: "docs",
           url,
           source_url: repoUrl,
-          source_type: "tensorplex-subnet-docs-website",
+          source_type: "tensorplex-subnet-docs-hardware",
           source_tier: "community-docs",
           confidence: "low",
           provider: "tensorplex-subnet-docs",
-          review_notes: "Discovered from Tensorplex subnet-docs website metadata. Not probed or verified by Metagraphed."
+          review_notes:
+            "Discovered from Tensorplex subnet-docs hardware requirements metadata.",
         });
       }
-    }
-  });
+
+      for (const [index, website] of arrayFrom(document.websites).entries()) {
+        const kind = surfaceKindForWebsiteLabel(website?.label);
+        if (!kind) {
+          continue;
+        }
+        for (const url of extractUrls(website?.url)) {
+          const label = slugify(website?.label || "website") || "website";
+          addCandidate({
+            id: `sn-${netuid}-tensorplex-${label}-${index + 1}`,
+            netuid,
+            name: `${displayName} ${website?.label || "website"}`,
+            kind,
+            url,
+            source_url: repoUrl,
+            source_type: "tensorplex-subnet-docs-website",
+            source_tier: "community-docs",
+            confidence: "low",
+            provider: "tensorplex-subnet-docs",
+            review_notes:
+              "Discovered from Tensorplex subnet-docs website metadata. Not probed or verified by Metagraphed.",
+          });
+        }
+      }
+    },
+  );
 }
 
 async function discoverFromTaopediaArticles() {
-  const treeUrl = "https://api.github.com/repos/e35ventura/taopedia-articles/git/trees/main?recursive=1";
+  const treeUrl =
+    "https://api.github.com/repos/e35ventura/taopedia-articles/git/trees/main?recursive=1";
   const tree = await fetchJson(treeUrl, githubHeaders());
   if (!Array.isArray(tree?.tree)) {
     warnings.push("taopedia-articles: failed to list repository tree");
@@ -259,7 +284,9 @@ async function discoverFromTaopediaArticles() {
   }
 
   for (const entry of tree.tree) {
-    const match = /^content\/pages\/subnet_(\d+)[^/]*\/index\.mdx$/.exec(entry.path || "");
+    const match = /^content\/pages\/subnet_(\d+)[^/]*\/index\.mdx$/.exec(
+      entry.path || "",
+    );
     if (!match) {
       continue;
     }
@@ -281,7 +308,8 @@ async function discoverFromTaopediaArticles() {
       source_tier: "community-docs",
       confidence: "low",
       provider: "taopedia-articles",
-      review_notes: "Discovered from the public Taopedia article repository. Not verified as an operational interface."
+      review_notes:
+        "Discovered from the public Taopedia article repository. Not verified as an operational interface.",
     });
   }
 }
@@ -299,14 +327,16 @@ async function discoverUniversalTaoMarketCapDashboards() {
       source_tier: "third-party-index",
       confidence: "medium",
       provider: "taomarketcap",
-      review_notes: "Universal TaoMarketCap subnet dashboard candidate. Third-party enrichment, not protocol authority."
+      review_notes:
+        "Universal TaoMarketCap subnet dashboard candidate. Third-party enrichment, not protocol authority.",
     });
   }
 }
 
 async function discoverFromGithubReadmes() {
   const sourceRepoCandidates = [...candidatesByKey.values()].filter(
-    (candidate) => candidate.kind === "source-repo" && parseGithubRepo(candidate.url)
+    (candidate) =>
+      candidate.kind === "source-repo" && parseGithubRepo(candidate.url),
   );
   const byRepo = new Map();
 
@@ -328,7 +358,14 @@ async function discoverFromGithubReadmes() {
     for (const candidate of candidates) {
       const repoSlug = slugify(`${repo.owner}-${repo.repo}`);
       const links = extractMarkdownLinks(readme.text, readme.url)
-        .map((link) => ({ ...link, classification: classifyDiscoveredLink(link.url, link.label, candidate.url) }))
+        .map((link) => ({
+          ...link,
+          classification: classifyDiscoveredLink(
+            link.url,
+            link.label,
+            candidate.url,
+          ),
+        }))
         .filter((link) => link.classification)
         .slice(0, 10);
 
@@ -344,7 +381,8 @@ async function discoverFromGithubReadmes() {
           source_tier: "community-docs",
           confidence: "low",
           provider: candidate.provider,
-          review_notes: "Discovered from a public GitHub README link. Requires verification before promotion."
+          review_notes:
+            "Discovered from a public GitHub README link. Requires verification before promotion.",
         });
       }
     }
@@ -352,7 +390,9 @@ async function discoverFromGithubReadmes() {
 }
 
 async function discoverFromProjectWebsites() {
-  const websiteCandidates = [...candidatesByKey.values()].filter((candidate) => candidate.kind === "website");
+  const websiteCandidates = [...candidatesByKey.values()].filter(
+    (candidate) => candidate.kind === "website",
+  );
   await mapLimit(websiteCandidates, 8, async (candidate) => {
     const root = normalizePublicUrl(candidate.url);
     if (!root) {
@@ -364,7 +404,7 @@ async function discoverFromProjectWebsites() {
 
     const html = await fetchText(root, {
       accept: "text/html,application/xhtml+xml",
-      warn: false
+      warn: false,
     });
     if (!html?.text) {
       return;
@@ -372,7 +412,10 @@ async function discoverFromProjectWebsites() {
 
     const links = extractHtmlLinks(html.text, root)
       .filter((link) => isLikelyProjectDomain(root, link.url))
-      .map((link) => ({ ...link, classification: classifyDiscoveredLink(link.url, link.label, root) }))
+      .map((link) => ({
+        ...link,
+        classification: classifyDiscoveredLink(link.url, link.label, root),
+      }))
       .filter((link) => link.classification)
       .slice(0, 10);
 
@@ -388,7 +431,8 @@ async function discoverFromProjectWebsites() {
         source_tier: "provider-claimed",
         confidence: "low",
         provider: candidate.provider,
-        review_notes: "Discovered from a public project website link. Requires verification before promotion."
+        review_notes:
+          "Discovered from a public project website link. Requires verification before promotion.",
       });
     }
   });
@@ -412,7 +456,7 @@ function addCommonApiPathCandidates(candidate, root) {
     { path: "/swagger", kind: "openapi", label: "Swagger UI" },
     { path: "/docs", kind: "docs", label: "docs" },
     { path: "/api", kind: "subnet-api", label: "API" },
-    { path: "/health", kind: "subnet-api", label: "health endpoint" }
+    { path: "/health", kind: "subnet-api", label: "health endpoint" },
   ];
 
   for (const commonPath of commonPaths) {
@@ -427,14 +471,17 @@ function addCommonApiPathCandidates(candidate, root) {
       source_tier: "provider-claimed",
       confidence: "low",
       provider: candidate.provider,
-      review_notes: "Common read-only path discovered from a public project website root. Requires verification before promotion."
+      review_notes:
+        "Common read-only path discovered from a public project website root. Requires verification before promotion.",
     });
   }
 }
 
 async function loadExistingGeneratedCandidates() {
   try {
-    const existing = await readJson(path.join(repoRoot, "registry/candidates/generated/public-sources.json"));
+    const existing = await readJson(
+      path.join(repoRoot, "registry/candidates/generated/public-sources.json"),
+    );
     return Array.isArray(existing.candidates) ? existing.candidates : [];
   } catch {
     return [];
@@ -443,10 +490,12 @@ async function loadExistingGeneratedCandidates() {
 
 function restoreExistingCandidatesForProvider(provider) {
   restoredProviders.add(provider);
-  for (const candidate of existingGeneratedCandidates.filter((entry) => entry.provider === provider)) {
+  for (const candidate of existingGeneratedCandidates.filter(
+    (entry) => entry.provider === provider,
+  )) {
     addCandidate({
       ...candidate,
-      review_notes: `${candidate.review_notes || "Candidate restored from previous generated bundle."} Source refresh failed; preserved pending a successful refresh.`
+      review_notes: `${candidate.review_notes || "Candidate restored from previous generated bundle."} Source refresh failed; preserved pending a successful refresh.`,
     });
   }
 }
@@ -466,7 +515,12 @@ function addCandidate(candidate) {
   const sourceUrls = [sourceUrl];
   const existing = candidatesByKey.get(key);
   if (existing) {
-    existing.source_urls = [...new Set([...(existing.source_urls || [existing.source_url]), ...sourceUrls])].sort();
+    existing.source_urls = [
+      ...new Set([
+        ...(existing.source_urls || [existing.source_url]),
+        ...sourceUrls,
+      ]),
+    ].sort();
     return;
   }
 
@@ -477,12 +531,13 @@ function addCandidate(candidate) {
     state: "schema-valid",
     auth_required: false,
     public_safe: true,
-    rate_limit_notes: "Candidate only; no recurring probe is configured until maintainer review.",
+    rate_limit_notes:
+      "Candidate only; no recurring probe is configured until maintainer review.",
     ...candidate,
     id: stableId,
     url: normalizedUrl,
     source_url: sourceUrl,
-    source_urls: sourceUrls
+    source_urls: sourceUrls,
   });
 }
 
@@ -528,12 +583,19 @@ function normalizePublicUrl(value) {
     return null;
   }
 
-  let candidate = value.trim().replace(/^<|>$/g, "").split("](")[0].replace(/\]+$/g, "");
+  let candidate = value
+    .trim()
+    .replace(/^<|>$/g, "")
+    .split("](")[0]
+    .replace(/\]+$/g, "");
   if (!candidate || isPlaceholder(candidate)) {
     return null;
   }
 
-  if (!/^https?:\/\//i.test(candidate) && /^[a-z0-9.-]+\.[a-z]{2,}(?:\/.*)?$/i.test(candidate)) {
+  if (
+    !/^https?:\/\//i.test(candidate) &&
+    /^[a-z0-9.-]+\.[a-z]{2,}(?:\/.*)?$/i.test(candidate)
+  ) {
     candidate = `https://${candidate}`;
   }
 
@@ -564,7 +626,7 @@ function isPlaceholder(value) {
     "deprecated.com",
     "deprecated.png",
     "localhost",
-    "127.0.0.1"
+    "127.0.0.1",
   ].some((placeholder) => normalized.includes(placeholder));
 }
 
@@ -644,13 +706,13 @@ async function fetchGithubReadme(repo) {
       const rawUrl = `https://raw.githubusercontent.com/${repo.owner}/${repo.repo}/${branch}/${name}`;
       const response = await fetchText(rawUrl, {
         accept: "text/markdown,text/plain",
-        warn: false
+        warn: false,
       });
       if (response?.status_code === 200 && response.text) {
         return {
           text: response.text.slice(0, 120000),
           url: rawUrl,
-          htmlUrl: `https://github.com/${repo.owner}/${repo.repo}/blob/${branch}/${name}`
+          htmlUrl: `https://github.com/${repo.owner}/${repo.repo}/blob/${branch}/${name}`,
         };
       }
     }
@@ -668,7 +730,10 @@ function extractMarkdownLinks(markdown, baseUrl) {
   for (const match of markdown.matchAll(bareUrlPattern)) {
     links.push({ label: "", url: normalizePublicUrl(match[0]) });
   }
-  return dedupeLinks(links.filter((link) => link.url), baseUrl);
+  return dedupeLinks(
+    links.filter((link) => link.url),
+    baseUrl,
+  );
 }
 
 function extractHtmlLinks(html, baseUrl) {
@@ -677,14 +742,21 @@ function extractHtmlLinks(html, baseUrl) {
   for (const match of html.matchAll(anchorPattern)) {
     links.push({
       label: stripHtml(match[2]).slice(0, 120),
-      url: normalizeLinkedUrl(match[1], baseUrl)
+      url: normalizeLinkedUrl(match[1], baseUrl),
     });
   }
-  return dedupeLinks(links.filter((link) => link.url), baseUrl);
+  return dedupeLinks(
+    links.filter((link) => link.url),
+    baseUrl,
+  );
 }
 
 function normalizeLinkedUrl(value, baseUrl) {
-  if (typeof value !== "string" || value.startsWith("#") || value.startsWith("mailto:")) {
+  if (
+    typeof value !== "string" ||
+    value.startsWith("#") ||
+    value.startsWith("mailto:")
+  ) {
     return null;
   }
   try {
@@ -715,7 +787,8 @@ function classifyDiscoveredLink(url, label, baseUrl) {
     return null;
   }
 
-  const haystack = `${label || ""} ${parsed.hostname} ${parsed.pathname}`.toLowerCase();
+  const haystack =
+    `${label || ""} ${parsed.hostname} ${parsed.pathname}`.toLowerCase();
   if (
     isSocialUrl(url) ||
     isBadgeOrAssetUrl(url) ||
@@ -729,7 +802,11 @@ function classifyDiscoveredLink(url, label, baseUrl) {
   if (haystack.includes("openapi") || haystack.includes("swagger")) {
     return { kind: "openapi", label: "OpenAPI surface" };
   }
-  if (haystack.includes("leaderboard") || haystack.includes("dashboard") || haystack.includes("stats")) {
+  if (
+    haystack.includes("leaderboard") ||
+    haystack.includes("dashboard") ||
+    haystack.includes("stats")
+  ) {
     return { kind: "dashboard", label: "dashboard" };
   }
   if (haystack.includes("api") || haystack.includes("health")) {
@@ -744,7 +821,11 @@ function classifyDiscoveredLink(url, label, baseUrl) {
   ) {
     return { kind: "docs", label: "docs" };
   }
-  if (haystack.includes("huggingface.co") || haystack.includes("dataset") || haystack.includes("model")) {
+  if (
+    haystack.includes("huggingface.co") ||
+    haystack.includes("dataset") ||
+    haystack.includes("model")
+  ) {
     return { kind: "data-artifact", label: "data artifact" };
   }
   if (isLikelyProjectDomain(baseUrl, url)) {
@@ -757,7 +838,10 @@ function isLikelyProjectDomain(baseUrl, candidateUrl) {
   try {
     const base = new URL(baseUrl);
     const candidate = new URL(candidateUrl);
-    return candidate.hostname === base.hostname || registrableDomain(candidate.hostname) === registrableDomain(base.hostname);
+    return (
+      candidate.hostname === base.hostname ||
+      registrableDomain(candidate.hostname) === registrableDomain(base.hostname)
+    );
   } catch {
     return false;
   }
@@ -778,8 +862,10 @@ function isGenericHost(hostname) {
     "bitbucket.org",
     "readthedocs.io",
     "taomarketcap.com",
-    "docs.google.com"
-  ].some((genericHost) => host === genericHost || host.endsWith(`.${genericHost}`));
+    "docs.google.com",
+  ].some(
+    (genericHost) => host === genericHost || host.endsWith(`.${genericHost}`),
+  );
 }
 
 function isBadgeOrAssetUrl(value) {
@@ -823,15 +909,20 @@ function isSocialUrl(value) {
       "telegram.me",
       "linkedin.com",
       "youtube.com",
-      "youtu.be"
-    ].some((socialHost) => host === socialHost || host.endsWith(`.${socialHost}`));
+      "youtu.be",
+    ].some(
+      (socialHost) => host === socialHost || host.endsWith(`.${socialHost}`),
+    );
   } catch {
     return false;
   }
 }
 
 function stripHtml(value) {
-  return String(value || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return String(value || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 async function fetchJson(url, headers = {}) {
@@ -842,9 +933,9 @@ async function fetchJson(url, headers = {}) {
       headers: {
         accept: "application/json",
         "user-agent": "metagraphed-candidate-discovery/0.0",
-        ...headers
+        ...headers,
       },
-      signal: controller.signal
+      signal: controller.signal,
     });
     if (!response.ok) {
       warnings.push(`${url}: HTTP ${response.status}`);
@@ -861,14 +952,17 @@ async function fetchJson(url, headers = {}) {
 
 async function fetchText(url, options = {}) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), options.timeoutMs || 10000);
+  const timer = setTimeout(
+    () => controller.abort(),
+    options.timeoutMs || 10000,
+  );
   try {
     const response = await fetch(url, {
       headers: {
         accept: options.accept || "*/*",
-        "user-agent": "metagraphed-candidate-discovery/0.0"
+        "user-agent": "metagraphed-candidate-discovery/0.0",
       },
-      signal: controller.signal
+      signal: controller.signal,
     });
     if (!response.ok && options.warn !== false) {
       warnings.push(`${url}: HTTP ${response.status}`);
@@ -876,7 +970,7 @@ async function fetchText(url, options = {}) {
     const text = response.ok ? await response.text() : "";
     return {
       status_code: response.status,
-      text
+      text,
     };
   } catch (error) {
     if (options.warn !== false) {
@@ -894,18 +988,21 @@ function githubHeaders() {
   }
   return {
     authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-    "x-github-api-version": "2022-11-28"
+    "x-github-api-version": "2022-11-28",
   };
 }
 
 async function mapLimit(items, limit, mapper) {
   const queue = [...items];
-  const workers = Array.from({ length: Math.min(limit, queue.length) }, async () => {
-    while (queue.length > 0) {
-      const item = queue.shift();
-      await mapper(item);
-    }
-  });
+  const workers = Array.from(
+    { length: Math.min(limit, queue.length) },
+    async () => {
+      while (queue.length > 0) {
+        const item = queue.shift();
+        await mapper(item);
+      }
+    },
+  );
   await Promise.all(workers);
 }
 
@@ -915,7 +1012,7 @@ function countBy(items, key) {
       items.reduce((accumulator, item) => {
         accumulator[item[key]] = (accumulator[item[key]] || 0) + 1;
         return accumulator;
-      }, {})
-    ).sort(([a], [b]) => a.localeCompare(b))
+      }, {}),
+    ).sort(([a], [b]) => a.localeCompare(b)),
   );
 }

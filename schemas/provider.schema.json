@@ -42,12 +42,7 @@
       "format": "uri"
     },
     "authority": {
-      "enum": [
-        "official",
-        "provider-claimed",
-        "community",
-        "registry-observed"
-      ]
+      "enum": ["official", "provider-claimed", "community", "registry-observed"]
     },
     "notes": {
       "type": "string"

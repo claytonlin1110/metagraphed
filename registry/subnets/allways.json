@@ -1,9 +1,5 @@
 {
-  "categories": [
-    "bitcoin",
-    "subnet-api",
-    "pilot"
-  ],
+  "categories": ["bitcoin", "subnet-api", "pilot"],
   "curation": {
     "gap_notes": [
       "No verified dashboard surface yet.",

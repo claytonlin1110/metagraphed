@@ -10,27 +10,83 @@ const errors = [];
 
 for (const workflow of workflows) {
   const content = await fs.readFile(path.join(workflowRoot, workflow), "utf8");
-  check(content.includes("permissions:"), workflow, "missing top-level permissions");
-  check(content.includes("concurrency:"), workflow, "missing concurrency guard");
-  check(!/\bcontinue-on-error:\s*true\b/.test(content), workflow, "must not mask failures with continue-on-error");
-  check(!/\$\{\{\s*github\.event\.(issue|comment|pull_request)\.(body|title)/.test(content), workflow, "untrusted GitHub event text is interpolated directly");
-  check(!/run:\s*\|[\s\S]*<<EOF/.test(content), workflow, "predictable heredoc delimiter in run block");
-  check(/uses:\s+actions\/checkout@/.test(content), workflow, "missing checkout action");
+  check(
+    content.includes("permissions:"),
+    workflow,
+    "missing top-level permissions",
+  );
+  check(
+    content.includes("concurrency:"),
+    workflow,
+    "missing concurrency guard",
+  );
+  check(
+    !/\bcontinue-on-error:\s*true\b/.test(content),
+    workflow,
+    "must not mask failures with continue-on-error",
+  );
+  check(
+    !/\$\{\{\s*github\.event\.(issue|comment|pull_request)\.(body|title)/.test(
+      content,
+    ),
+    workflow,
+    "untrusted GitHub event text is interpolated directly",
+  );
+  check(
+    !/run:\s*\|[\s\S]*<<EOF/.test(content),
+    workflow,
+    "predictable heredoc delimiter in run block",
+  );
+  check(
+    /uses:\s+actions\/checkout@/.test(content),
+    workflow,
+    "missing checkout action",
+  );
   for (const match of content.matchAll(/uses:\s+([^\s#]+)/g)) {
     const actionRef = match[1].replace(/^['"]|['"]$/g, "");
     if (actionRef.startsWith("./") || actionRef.startsWith("docker://")) {
       continue;
     }
-    check(/@[a-f0-9]{40}$/i.test(actionRef), workflow, `action ref must be pinned to a full commit SHA: ${actionRef}`);
+    check(
+      /@[a-f0-9]{40}$/i.test(actionRef),
+      workflow,
+      `action ref must be pinned to a full commit SHA: ${actionRef}`,
+    );
   }
   if (workflow === "intake-validation.yml") {
-    check(content.includes("contains(github.event.issue.labels.*.name, 'interface-submission')"), workflow, "intake must be exact-label gated");
+    check(
+      content.includes(
+        "contains(github.event.issue.labels.*.name, 'interface-submission')",
+      ),
+      workflow,
+      "intake must be exact-label gated",
+    );
   }
   if (workflow === "intake-import-pr.yml") {
-    check(content.includes("contains(github.event.issue.labels.*.name, 'interface-submission')"), workflow, "intake import must require interface-submission label");
-    check(content.includes("contains(github.event.issue.labels.*.name, 'metagraphed-import-approved')"), workflow, "intake import must require maintainer approval label");
-    check(content.includes("peter-evans/create-pull-request@"), workflow, "intake import must open a PR instead of direct-publishing");
-    check(content.includes("npm run intake:import"), workflow, "intake import must use the checked-in import script");
+    check(
+      content.includes(
+        "contains(github.event.issue.labels.*.name, 'interface-submission')",
+      ),
+      workflow,
+      "intake import must require interface-submission label",
+    );
+    check(
+      content.includes(
+        "contains(github.event.issue.labels.*.name, 'metagraphed-import-approved')",
+      ),
+      workflow,
+      "intake import must require maintainer approval label",
+    );
+    check(
+      content.includes("peter-evans/create-pull-request@"),
+      workflow,
+      "intake import must open a PR instead of direct-publishing",
+    );
+    check(
+      content.includes("npm run intake:import"),
+      workflow,
+      "intake import must use the checked-in import script",
+    );
   }
 }
 

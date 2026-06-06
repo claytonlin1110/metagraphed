@@ -3,8 +3,14 @@ import path from "node:path";
 import { repoRoot } from "./lib.mjs";
 
 const templateRoot = path.join(repoRoot, ".github/ISSUE_TEMPLATE");
-const interfaceTemplate = await fs.readFile(path.join(templateRoot, "add-update-subnet-interface.yml"), "utf8");
-const statusTemplate = await fs.readFile(path.join(templateRoot, "report-endpoint-status-issue.yml"), "utf8");
+const interfaceTemplate = await fs.readFile(
+  path.join(templateRoot, "add-update-subnet-interface.yml"),
+  "utf8",
+);
+const statusTemplate = await fs.readFile(
+  path.join(templateRoot, "report-endpoint-status-issue.yml"),
+  "utf8",
+);
 const errors = [];
 
 checkIncludes(interfaceTemplate.toLowerCase(), "interface template", [
@@ -17,7 +23,7 @@ checkIncludes(interfaceTemplate.toLowerCase(), "interface template", [
   "id: auth_required",
   "schema-valid submissions are not auto-published",
   "metagraphed-import-approved",
-  "read-only probes"
+  "read-only probes",
 ]);
 
 for (const kind of [
@@ -31,7 +37,7 @@ for (const kind of [
   "docs",
   "data-artifact",
   "subtensor-rpc",
-  "subtensor-wss"
+  "subtensor-wss",
 ]) {
   checkIncludes(interfaceTemplate, "interface template", [`- ${kind}`]);
 }
@@ -43,7 +49,7 @@ checkIncludes(statusTemplate, "status template", [
   "id: surface_id",
   "id: issue_type",
   "unsafe-or-private",
-  "This report does not include secrets"
+  "This report does not include secrets",
 ]);
 
 if (errors.length > 0) {

@@ -61,9 +61,13 @@ export async function loadProviders() {
 }
 
 export async function loadSubnets() {
-  const files = await listJsonFilesRecursive(path.join(repoRoot, "registry/subnets"));
+  const files = await listJsonFilesRecursive(
+    path.join(repoRoot, "registry/subnets"),
+  );
   const subnets = await Promise.all(files.map(readJson));
-  return subnets.sort((a, b) => a.netuid - b.netuid || a.slug.localeCompare(b.slug));
+  return subnets.sort(
+    (a, b) => a.netuid - b.netuid || a.slug.localeCompare(b.slug),
+  );
 }
 
 export async function loadNativeSnapshot() {
@@ -71,7 +75,9 @@ export async function loadNativeSnapshot() {
 }
 
 export async function loadCandidates() {
-  const files = await listJsonFilesRecursive(path.join(repoRoot, "registry/candidates"));
+  const files = await listJsonFilesRecursive(
+    path.join(repoRoot, "registry/candidates"),
+  );
   const documents = await Promise.all(files.map(readJson));
   const candidates = documents.flatMap((document) => {
     if (Array.isArray(document.candidates)) {
@@ -79,18 +85,22 @@ export async function loadCandidates() {
     }
     return [document];
   });
-  return candidates.sort((a, b) => a.netuid - b.netuid || a.id.localeCompare(b.id));
+  return candidates.sort(
+    (a, b) => a.netuid - b.netuid || a.id.localeCompare(b.id),
+  );
 }
 
 export async function loadVerification() {
   try {
-    return await readJson(path.join(repoRoot, "registry/verification/latest.json"));
+    return await readJson(
+      path.join(repoRoot, "registry/verification/latest.json"),
+    );
   } catch (error) {
     if (error.code === "ENOENT") {
       return {
         schema_version: 1,
         generated_at: null,
-        results: []
+        results: [],
       };
     }
     throw error;
@@ -104,8 +114,8 @@ export function flattenSurfaces(subnets) {
         ...surface,
         netuid: subnet.netuid,
         subnet_slug: subnet.slug,
-        subnet_name: subnet.name
-      }))
+        subnet_name: subnet.name,
+      })),
     )
     .sort((a, b) => a.netuid - b.netuid || a.id.localeCompare(b.id));
 }
@@ -123,7 +133,7 @@ export function sortValue(value) {
     return Object.fromEntries(
       Object.entries(value)
         .sort(([a], [b]) => a.localeCompare(b))
-        .map(([key, nested]) => [key, sortValue(nested)])
+        .map(([key, nested]) => [key, sortValue(nested)]),
     );
   }
 
@@ -148,7 +158,12 @@ export function isUnsafeUrl(value) {
 
     const host = url.hostname.toLowerCase();
     const literalIp = isIP(host);
-    if (host === "localhost" || host === "0.0.0.0" || host === "127.0.0.1" || host === "::1") {
+    if (
+      host === "localhost" ||
+      host === "0.0.0.0" ||
+      host === "127.0.0.1" ||
+      host === "::1"
+    ) {
       return true;
     }
     if (literalIp === 4) {
@@ -161,7 +176,12 @@ export function isUnsafeUrl(value) {
       );
     }
     if (literalIp === 6) {
-      return host === "::" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80");
+      return (
+        host === "::" ||
+        host.startsWith("fc") ||
+        host.startsWith("fd") ||
+        host.startsWith("fe80")
+      );
     }
 
     return false;
@@ -175,18 +195,28 @@ export function normalizePublicUrl(value) {
     return null;
   }
 
-  let candidate = value.trim().replace(/^<|>$/g, "").split("](")[0].replace(/\]+$/g, "");
+  let candidate = value
+    .trim()
+    .replace(/^<|>$/g, "")
+    .split("](")[0]
+    .replace(/\]+$/g, "");
   if (!candidate) {
     return null;
   }
 
-  if (!/^(https?|wss?):\/\//i.test(candidate) && /^[a-z0-9.-]+\.[a-z]{2,}(?:\/.*)?$/i.test(candidate)) {
+  if (
+    !/^(https?|wss?):\/\//i.test(candidate) &&
+    /^[a-z0-9.-]+\.[a-z]{2,}(?:\/.*)?$/i.test(candidate)
+  ) {
     candidate = `https://${candidate}`;
   }
 
   try {
     const url = new URL(candidate);
-    if (!["http:", "https:", "ws:", "wss:"].includes(url.protocol) || isUnsafeUrl(url.toString())) {
+    if (
+      !["http:", "https:", "ws:", "wss:"].includes(url.protocol) ||
+      isUnsafeUrl(url.toString())
+    ) {
       return null;
     }
     url.hash = "";
@@ -208,11 +238,15 @@ export function hashJson(value) {
 }
 
 export function isJsonContentType(value) {
-  return String(value || "").toLowerCase().includes("json");
+  return String(value || "")
+    .toLowerCase()
+    .includes("json");
 }
 
 export function isHtmlContentType(value) {
-  return String(value || "").toLowerCase().includes("html");
+  return String(value || "")
+    .toLowerCase()
+    .includes("html");
 }
 
 export function buildTimestamp() {
@@ -229,10 +263,20 @@ export function slugify(value) {
     .replace(/-{2,}/g, "-");
 }
 
-export function buildRpcEndpointArtifact({ surfaces, healthSurfaces = [], generatedAt, contractVersion, source }) {
-  const healthBySurface = new Map(healthSurfaces.map((surface) => [surface.surface_id, surface]));
+export function buildRpcEndpointArtifact({
+  surfaces,
+  healthSurfaces = [],
+  generatedAt,
+  contractVersion,
+  source,
+}) {
+  const healthBySurface = new Map(
+    healthSurfaces.map((surface) => [surface.surface_id, surface]),
+  );
   const endpoints = surfaces
-    .filter((surface) => ["subtensor-rpc", "subtensor-wss"].includes(surface.kind))
+    .filter((surface) =>
+      ["subtensor-rpc", "subtensor-wss"].includes(surface.kind),
+    )
     .map((surface) => {
       const health = healthBySurface.get(surface.id) || {};
       return {
@@ -259,36 +303,49 @@ export function buildRpcEndpointArtifact({ surfaces, healthSurfaces = [], genera
         last_checked: health.verified_at || health.last_checked || null,
         error: health.error || null,
         rate_limit_notes: surface.rate_limit_notes || null,
-        source_urls: surface.source_urls || []
+        source_urls: surface.source_urls || [],
       };
     })
-    .sort((a, b) => a.provider.localeCompare(b.provider) || a.id.localeCompare(b.id));
+    .sort(
+      (a, b) =>
+        a.provider.localeCompare(b.provider) || a.id.localeCompare(b.id),
+    );
 
   return {
     schema_version: 1,
     contract_version: contractVersion,
     generated_at: generatedAt,
     source,
-    notes: "Bittensor base-layer RPC endpoints only. These are chain-level surfaces, not subnet application APIs.",
+    notes:
+      "Bittensor base-layer RPC endpoints only. These are chain-level surfaces, not subnet application APIs.",
     summary: {
       endpoint_count: endpoints.length,
       by_kind: countRecord(endpoints, (endpoint) => endpoint.kind),
       by_provider: countRecord(endpoints, (endpoint) => endpoint.provider),
       by_status: countRecord(endpoints, (endpoint) => endpoint.status),
-      archive_supported_count: endpoints.filter((endpoint) => endpoint.archive_support === true).length
+      archive_supported_count: endpoints.filter(
+        (endpoint) => endpoint.archive_support === true,
+      ).length,
     },
-    endpoints
+    endpoints,
   };
 }
 
-export function buildEndpointPoolArtifact({ generatedAt, contractVersion, rpcArtifact }) {
+export function buildEndpointPoolArtifact({
+  generatedAt,
+  contractVersion,
+  rpcArtifact,
+}) {
   const endpoints = (rpcArtifact.endpoints || []).map((endpoint) => {
     const score = endpointScore(endpoint);
     return {
       ...endpoint,
       score,
-      pool_eligible: endpoint.status === "ok" && endpoint.auth_required === false && endpoint.public_safe === true,
-      unsafe_methods_blocked: true
+      pool_eligible:
+        endpoint.status === "ok" &&
+        endpoint.auth_required === false &&
+        endpoint.public_safe === true,
+      unsafe_methods_blocked: true,
     };
   });
 
@@ -299,34 +356,56 @@ export function buildEndpointPoolArtifact({ generatedAt, contractVersion, rpcArt
     source: "rpc-endpoint-probes",
     notes: [
       "Endpoint pools are advisory only in v1.",
-      "Future proxy/load-balancer routes must block write and unsafe RPC methods by default."
+      "Future proxy/load-balancer routes must block write and unsafe RPC methods by default.",
     ],
     disabled_proxy_contract: {
       enabled: false,
-      allowed_methods: ["chain_getHeader", "chain_getBlockHash", "system_health", "rpc_methods"],
-      denied_method_patterns: ["author_", "state_call", "sudo_", "payment_", "contracts_"],
+      allowed_methods: [
+        "chain_getHeader",
+        "chain_getBlockHash",
+        "system_health",
+        "rpc_methods",
+      ],
+      denied_method_patterns: [
+        "author_",
+        "state_call",
+        "sudo_",
+        "payment_",
+        "contracts_",
+      ],
       feature_flag: "METAGRAPH_ENABLE_RPC_PROXY",
       rate_limit_required: true,
-      waf_required: true
+      waf_required: true,
     },
     pools: [
       endpointPool("finney-rpc", "subtensor-rpc", endpoints),
       endpointPool("finney-wss", "subtensor-wss", endpoints),
-      endpointPool("finney-archive", "archive", endpoints.filter((endpoint) => endpoint.archive_support === true))
-    ]
+      endpointPool(
+        "finney-archive",
+        "archive",
+        endpoints.filter((endpoint) => endpoint.archive_support === true),
+      ),
+    ],
   };
 }
 
 function endpointPool(id, kind, endpoints) {
   const poolEndpoints = endpoints
     .filter((endpoint) => kind === "archive" || endpoint.kind === kind)
-    .sort((a, b) => b.score - a.score || (a.latency_ms ?? 999999) - (b.latency_ms ?? 999999) || a.id.localeCompare(b.id));
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        (a.latency_ms ?? 999999) - (b.latency_ms ?? 999999) ||
+        a.id.localeCompare(b.id),
+    );
   return {
     id,
     kind,
     endpoint_count: poolEndpoints.length,
-    eligible_count: poolEndpoints.filter((endpoint) => endpoint.pool_eligible).length,
-    best_endpoint_id: poolEndpoints.find((endpoint) => endpoint.pool_eligible)?.id || null,
+    eligible_count: poolEndpoints.filter((endpoint) => endpoint.pool_eligible)
+      .length,
+    best_endpoint_id:
+      poolEndpoints.find((endpoint) => endpoint.pool_eligible)?.id || null,
     endpoints: poolEndpoints.map((endpoint) => ({
       archive_support: endpoint.archive_support,
       id: endpoint.id,
@@ -336,8 +415,8 @@ function endpointPool(id, kind, endpoints) {
       provider: endpoint.provider,
       score: endpoint.score,
       status: endpoint.status,
-      url: endpoint.url
-    }))
+      url: endpoint.url,
+    })),
   };
 }
 
@@ -346,12 +425,19 @@ function endpointScore(endpoint) {
   if (endpoint.status === "ok") score += 50;
   if (endpoint.archive_support === true) score += 15;
   if (endpoint.latest_block) score += 10;
-  if (endpoint.methods_supported && typeof endpoint.methods_supported === "object") {
-    score += Math.min(Object.values(endpoint.methods_supported).filter(Boolean).length * 5, 20);
+  if (
+    endpoint.methods_supported &&
+    typeof endpoint.methods_supported === "object"
+  ) {
+    score += Math.min(
+      Object.values(endpoint.methods_supported).filter(Boolean).length * 5,
+      20,
+    );
   } else if (Array.isArray(endpoint.methods_supported)) {
     score += Math.min(endpoint.methods_supported.length, 20);
   }
-  if (Number.isFinite(endpoint.latency_ms)) score += Math.max(0, 20 - Math.round(endpoint.latency_ms / 100));
+  if (Number.isFinite(endpoint.latency_ms))
+    score += Math.max(0, 20 - Math.round(endpoint.latency_ms / 100));
   if (endpoint.auth_required) score -= 25;
   if (endpoint.status === "degraded") score -= 10;
   if (endpoint.status === "failed") score -= 50;
@@ -365,7 +451,7 @@ function countRecord(items, keyFn) {
         const key = keyFn(item) || "unknown";
         accumulator[key] = (accumulator[key] || 0) + 1;
         return accumulator;
-      }, {})
-    ).sort(([a], [b]) => a.localeCompare(b))
+      }, {}),
+    ).sort(([a], [b]) => a.localeCompare(b)),
   );
 }

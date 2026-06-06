@@ -10,7 +10,7 @@ const targetRoots = [
   "public",
   ".github",
   "workers",
-  "wrangler.jsonc"
+  "wrangler.jsonc",
 ];
 
 const patterns = [
@@ -19,9 +19,20 @@ const patterns = [
   { name: "github token", regex: /ghp_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+/ },
   { name: "openai-style token", regex: /sk-[A-Za-z0-9]{20,}/ },
   { name: "slack-style token", regex: /xox[baprs]-[A-Za-z0-9-]+/ },
-  { name: "private or loopback URL", regex: /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[0-1])\.\d+\.\d+)/i },
-  { name: "token-like assignment", regex: /\b(?:api[_-]?key|access[_-]?token|auth[_-]?token|secret|password)\s*[:=]\s*["']?[A-Za-z0-9_./+=-]{16,}/i },
-  { name: "wallet/key wording", regex: /\b(coldkey|hotkey|wallet path|private key|seed phrase|mnemonic)\b/i }
+  {
+    name: "private or loopback URL",
+    regex:
+      /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[0-1])\.\d+\.\d+)/i,
+  },
+  {
+    name: "token-like assignment",
+    regex:
+      /\b(?:api[_-]?key|access[_-]?token|auth[_-]?token|secret|password)\s*[:=]\s*["']?[A-Za-z0-9_./+=-]{16,}/i,
+  },
+  {
+    name: "wallet/key wording",
+    regex: /\b(coldkey|hotkey|wallet path|private key|seed phrase|mnemonic)\b/i,
+  },
 ];
 
 const findings = [];

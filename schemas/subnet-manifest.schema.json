@@ -30,11 +30,7 @@
       "pattern": "^[a-z0-9][a-z0-9-]*$"
     },
     "status": {
-      "enum": [
-        "active",
-        "inactive",
-        "unknown"
-      ]
+      "enum": ["active", "inactive", "unknown"]
     },
     "categories": {
       "type": "array",
@@ -48,24 +44,15 @@
       "format": "uri"
     },
     "source_repo": {
-      "type": [
-        "string",
-        "null"
-      ],
+      "type": ["string", "null"],
       "format": "uri"
     },
     "dashboard_url": {
-      "type": [
-        "string",
-        "null"
-      ],
+      "type": ["string", "null"],
       "format": "uri"
     },
     "website_url": {
-      "type": [
-        "string",
-        "null"
-      ],
+      "type": ["string", "null"],
       "format": "uri"
     },
     "notes": {
@@ -156,11 +143,7 @@
           "format": "uri"
         },
         "schema_status": {
-          "enum": [
-            "machine-readable",
-            "ui-only",
-            "not-captured"
-          ]
+          "enum": ["machine-readable", "ui-only", "not-captured"]
         },
         "source_urls": {
           "type": "array",
@@ -191,30 +174,16 @@
     "probe": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "enabled",
-        "method",
-        "expect"
-      ],
+      "required": ["enabled", "method", "expect"],
       "properties": {
         "enabled": {
           "type": "boolean"
         },
         "method": {
-          "enum": [
-            "GET",
-            "HEAD",
-            "JSON-RPC",
-            "WSS-RPC"
-          ]
+          "enum": ["GET", "HEAD", "JSON-RPC", "WSS-RPC"]
         },
         "expect": {
-          "enum": [
-            "json",
-            "html",
-            "sse",
-            "any"
-          ]
+          "enum": ["json", "html", "sse", "any"]
         },
         "timeout_ms": {
           "type": "integer",
@@ -226,10 +195,7 @@
     "curation": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "level",
-        "review_state"
-      ],
+      "required": ["level", "review_state"],
       "properties": {
         "level": {
           "enum": [
@@ -250,16 +216,10 @@
           ]
         },
         "reviewed_at": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": ["string", "null"]
         },
         "verified_at": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": ["string", "null"]
         },
         "source_count": {
           "type": "integer",
@@ -276,10 +236,7 @@
     "link": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "label",
-        "url"
-      ],
+      "required": ["label", "url"],
       "properties": {
         "label": {
           "type": "string",
@@ -298,10 +255,7 @@
     "verification": {
       "type": "object",
       "additionalProperties": true,
-      "required": [
-        "classification",
-        "verified_at"
-      ],
+      "required": ["classification", "verified_at"],
       "properties": {
         "classification": {
           "enum": [
@@ -332,16 +286,10 @@
           "maximum": 100
         },
         "content_type": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": ["string", "null"]
         },
         "redirect_target": {
-          "type": [
-            "string",
-            "null"
-          ],
+          "type": ["string", "null"],
           "format": "uri"
         }
       }

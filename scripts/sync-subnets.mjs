@@ -24,8 +24,8 @@ const summary = {
   renamed_netuids: diff.renamed,
   block_range: {
     min: Math.min(...snapshot.subnets.map((subnet) => subnet.block)),
-    max: Math.max(...snapshot.subnets.map((subnet) => subnet.block))
-  }
+    max: Math.max(...snapshot.subnets.map((subnet) => subnet.block)),
+  },
 };
 
 if (!dryRun) {
@@ -43,13 +43,13 @@ function fetchNativeSnapshot() {
       "python",
       "scripts/fetch-native-subnets.py",
       "--network",
-      "finney"
+      "finney",
     ],
     {
       cwd: repoRoot,
       encoding: "utf8",
-      maxBuffer: 1024 * 1024 * 20
-    }
+      maxBuffer: 1024 * 1024 * 20,
+    },
   );
 
   if (result.status !== 0) {
@@ -58,10 +58,10 @@ function fetchNativeSnapshot() {
         "Failed to fetch native Bittensor subnet snapshot.",
         "Install uv or run the Bittensor SDK helper manually.",
         result.stderr.trim(),
-        result.stdout.trim()
+        result.stdout.trim(),
       ]
         .filter(Boolean)
-        .join("\n")
+        .join("\n"),
     );
   }
 
@@ -83,13 +83,16 @@ async function fetchTaoMarketCapCount() {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
-    const response = await fetch("https://api.taomarketcap.com/public/v1/subnets/?limit=1", {
-      headers: {
-        accept: "application/json",
-        "user-agent": "metagraphed-subnet-sync/0.0"
+    const response = await fetch(
+      "https://api.taomarketcap.com/public/v1/subnets/?limit=1",
+      {
+        headers: {
+          accept: "application/json",
+          "user-agent": "metagraphed-subnet-sync/0.0",
+        },
+        signal: controller.signal,
       },
-      signal: controller.signal
-    });
+    );
     clearTimeout(timer);
     if (!response.ok) {
       return null;
@@ -102,8 +105,12 @@ async function fetchTaoMarketCapCount() {
 }
 
 function diffSnapshots(existing, current) {
-  const existingByNetuid = new Map((existing.subnets || []).map((subnet) => [subnet.netuid, subnet]));
-  const currentByNetuid = new Map(current.subnets.map((subnet) => [subnet.netuid, subnet]));
+  const existingByNetuid = new Map(
+    (existing.subnets || []).map((subnet) => [subnet.netuid, subnet]),
+  );
+  const currentByNetuid = new Map(
+    current.subnets.map((subnet) => [subnet.netuid, subnet]),
+  );
   const added = [];
   const removed = [];
   const renamed = [];
