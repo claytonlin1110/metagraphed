@@ -280,5 +280,8 @@
       "url": "https://taomarketcap.com/subnets/64"
     }
   ],
-  "website_url": "https://chutes.ai/"
+  "website_url": "https://chutes.ai/",
+  "social": {
+    "x": "https://x.com/chutes_ai"
+  }
 }
