@@ -22,6 +22,7 @@ import {
   createLocalArtifactEnv,
   flattenSurfaces,
   formatLlmMarkdownText,
+  fixtureCaptureFailureReason,
   formatRepositoryJson,
   hashJson,
   isCredentialedUrl,
@@ -110,6 +111,18 @@ const native = {
 const providers = [{ id: "allways" }, { id: "gittensor" }];
 
 describe("script utility contracts", () => {
+  test("uses public-safe fixture capture parse failure reasons", () => {
+    const error = new SyntaxError(
+      `Unexpected token 'T', "TOKEN=abc" is not valid JSON`,
+    );
+
+    assert.equal(fixtureCaptureFailureReason(error), "invalid json response");
+    assert.equal(
+      fixtureCaptureFailureReason(error).includes("TOKEN=abc"),
+      false,
+    );
+  });
+
   test("classifies redirect-limit probes as unsupported", () => {
     assert.equal(
       classifyHttpProbe(
