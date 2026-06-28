@@ -51,6 +51,7 @@ import {
   handleHealthPercentiles,
   handleHealthTrends,
   withEdgeCache,
+  withNeuronsEdgeCache,
 } from "./request-handlers/analytics.mjs";
 import {
   loadStagedNeurons,
@@ -1234,15 +1235,21 @@ export async function handleRequest(request, env = {}, ctx = {}) {
       resolved.url.pathname,
     );
     if (concentrationMatch) {
-      // Per-UID range read over the neurons tier, deterministic per cron snapshot
-      // — edge-cache on last_run_at like the sibling metagraph routes.
-      return withEdgeCache(request, ctx, env, "subnet-concentration", () =>
-        handleSubnetConcentration(
-          request,
-          env,
-          Number(concentrationMatch[1]),
-          resolved.url,
-        ),
+      // Per-UID range read over the neurons tier — edge-cache busts on the
+      // subnet's neuron captured_at stamp, not the health prober tick.
+      return withNeuronsEdgeCache(
+        request,
+        ctx,
+        env,
+        Number(concentrationMatch[1]),
+        "subnet-concentration",
+        () =>
+          handleSubnetConcentration(
+            request,
+            env,
+            Number(concentrationMatch[1]),
+            resolved.url,
+          ),
       );
     }
     const turnoverMatch = SUBNET_TURNOVER_PATH_PATTERN.exec(
@@ -1293,16 +1300,21 @@ export async function handleRequest(request, env = {}, ctx = {}) {
       resolved.url.pathname,
     );
     if (metagraphMatch) {
-      // Full per-subnet metagraph (range read over the neurons tier), deterministic
-      // per cron snapshot — edge-cache on last_run_at; ?validator_permit rides the
-      // search into the key.
-      return withEdgeCache(request, ctx, env, "subnet-metagraph", () =>
-        handleSubnetMetagraph(
-          request,
-          env,
-          Number(metagraphMatch[1]),
-          resolved.url,
-        ),
+      // Full per-subnet metagraph (range read over the neurons tier) — edge-cache
+      // busts on neuron captured_at; ?validator_permit rides the search into the key.
+      return withNeuronsEdgeCache(
+        request,
+        ctx,
+        env,
+        Number(metagraphMatch[1]),
+        "subnet-metagraph",
+        () =>
+          handleSubnetMetagraph(
+            request,
+            env,
+            Number(metagraphMatch[1]),
+            resolved.url,
+          ),
       );
     }
     const neuronMatch = SUBNET_NEURON_PATH_PATTERN.exec(resolved.url.pathname);
@@ -1318,15 +1330,20 @@ export async function handleRequest(request, env = {}, ctx = {}) {
       resolved.url.pathname,
     );
     if (validatorsMatch) {
-      // Validator slice of the metagraph (filtered range read), deterministic per
-      // cron snapshot — edge-cache on last_run_at like the sibling routes.
-      return withEdgeCache(request, ctx, env, "subnet-validators", () =>
-        handleSubnetValidators(
-          request,
-          env,
-          Number(validatorsMatch[1]),
-          resolved.url,
-        ),
+      // Validator slice of the metagraph — edge-cache busts on neuron captured_at.
+      return withNeuronsEdgeCache(
+        request,
+        ctx,
+        env,
+        Number(validatorsMatch[1]),
+        "subnet-validators",
+        () =>
+          handleSubnetValidators(
+            request,
+            env,
+            Number(validatorsMatch[1]),
+            resolved.url,
+          ),
       );
     }
     // Per-subnet chain-event stream (#1345): account_events filtered by netuid.
