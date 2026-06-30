@@ -94,8 +94,8 @@
       "authority": "community",
       "id": "sn-47-evolai-subnet-api",
       "kind": "subnet-api",
-      "name": "EvolAI Proxy API (datasets)",
-      "notes": "Public read endpoint on the EvolAI-operated Hugging Face Space proxy API. The Space README documents GET /datasets and GET /evaluations/rankings on https://evolai-gate.hf.space.",
+      "name": "EvolAI Proxy API",
+      "notes": "Public GET /datasets list endpoint on the EvolAI-operated Hugging Face Space proxy at https://evolai-gate.hf.space.",
       "probe": {
         "enabled": true,
         "expect": "json",
