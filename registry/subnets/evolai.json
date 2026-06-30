@@ -88,6 +88,32 @@
       },
       "source_urls": ["https://github.com/openevolai/evolai"],
       "url": "https://evolai.ai/"
+    },
+    {
+      "auth_required": false,
+      "authority": "community",
+      "id": "sn-47-evolai-subnet-api",
+      "kind": "subnet-api",
+      "name": "EvolAI Proxy API (datasets)",
+      "notes": "Public read endpoint on the EvolAI-operated Hugging Face Space proxy API. Also exposes GET /evaluations/rankings; validator-only routes require Bittensor hotkey signatures.",
+      "probe": {
+        "enabled": true,
+        "expect": "json",
+        "method": "GET",
+        "timeout_ms": 10000
+      },
+      "provider": "evolai",
+      "public_safe": true,
+      "review": {
+        "confidence": "medium",
+        "state": "community-submitted",
+        "submitted_by": "claytonlin1110"
+      },
+      "source_urls": [
+        "https://huggingface.co/spaces/evolai/gate",
+        "https://huggingface.co/spaces/evolai/gate/blob/main/README.md"
+      ],
+      "url": "https://evolai-gate.hf.space/datasets"
     }
   ]
 }
