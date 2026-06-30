@@ -22,7 +22,9 @@
 //
 // Optional `?since=<ISO-8601>` returns only items at or after that instant
 // (e.g. ?since=2026-06-01 or ?since=2026-06-01T00:00:00Z), for incremental
-// polling; it composes with `?tag=`. A malformed `since` is a 400.
+// polling; optional `?until=<ISO-8601>` returns only items at or before that
+// instant (same accepted forms). Both compose with `?tag=`; `since` after
+// `until` is a 400. A malformed bound is a 400.
 
 import {
   EXPOSED_RESPONSE_HEADERS_VALUE,
@@ -319,6 +321,17 @@ function filterSince(items, sinceMs) {
   });
 }
 
+// Optional `?until=` filter: keep only items at or before `untilMs` (epoch ms).
+// A null bound is a no-op; unparseable timestamps are dropped, mirroring
+// filterSince so a malformed feed entry never leaks past an explicit `until`.
+function filterUntil(items, untilMs) {
+  if (untilMs == null) return items;
+  return items.filter((item) => {
+    const t = Date.parse(item.timestamp);
+    return !Number.isNaN(t) && t <= untilMs;
+  });
+}
+
 function jsonFeed(meta, items) {
   return `${JSON.stringify(
     {
@@ -538,8 +551,8 @@ export async function handleFeedRequest(request, env, url, deps = {}) {
   }
   const format = resolveFeedFormat(url.pathname, request.headers.get("accept"));
 
-  // Optional `?since=` lower bound (parsed once, here, so a malformed value is
-  // rejected before any artifact work). null when the param is absent.
+  // Optional `?since=` / `?until=` bounds (parsed once, here, so malformed
+  // values are rejected before any artifact work). null when absent.
   let sinceMs = null;
   const sinceParam = url.searchParams.get("since");
   if (sinceParam != null) {
@@ -551,6 +564,27 @@ export async function handleFeedRequest(request, env, url, deps = {}) {
         400,
       );
     }
+  }
+
+  let untilMs = null;
+  const untilParam = url.searchParams.get("until");
+  if (untilParam != null) {
+    untilMs = parseSinceParam(untilParam);
+    if (Number.isNaN(untilMs)) {
+      return fail(
+        "invalid_until",
+        "`until` must be an ISO-8601 date or date-time, e.g. 2026-06-01 or 2026-06-01T00:00:00Z.",
+        400,
+      );
+    }
+  }
+
+  if (sinceMs != null && untilMs != null && sinceMs > untilMs) {
+    return fail(
+      "invalid_query",
+      "`since` must not be after `until`.",
+      400,
+    );
   }
 
   let items;
@@ -606,6 +640,7 @@ export async function handleFeedRequest(request, env, url, deps = {}) {
 
   items = filterByTag(items, url.searchParams.get("tag"));
   items = filterSince(items, sinceMs);
+  items = filterUntil(items, untilMs);
   items = sortAndCap(items);
   const meta = {
     title,
@@ -667,5 +702,6 @@ export const __test = {
   escapeXml,
   filterByTag,
   filterSince,
+  filterUntil,
   parseSinceParam,
 };

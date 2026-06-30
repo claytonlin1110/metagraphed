@@ -48,6 +48,7 @@ const {
   escapeXml,
   filterByTag,
   filterSince,
+  filterUntil,
   parseSinceParam,
 } = __test;
 
@@ -477,6 +478,34 @@ describe("feeds — filterSince", () => {
   });
 });
 
+describe("feeds — filterUntil", () => {
+  const items = [
+    { id: "old", timestamp: "2026-06-10T00:00:00.000Z" },
+    { id: "new", timestamp: "2026-06-20T00:00:00.000Z" },
+    { id: "bad", timestamp: "not-a-date" },
+  ];
+
+  test("a null bound is a no-op (returns the input)", () => {
+    assert.equal(filterUntil(items, null), items);
+  });
+
+  test("keeps items at or before the bound; drops unparseable timestamps", () => {
+    const kept = filterUntil(items, Date.parse("2026-06-15T00:00:00.000Z"));
+    assert.deepEqual(
+      kept.map((i) => i.id),
+      ["old"],
+    );
+  });
+
+  test("is inclusive of the exact bound", () => {
+    const kept = filterUntil(items, Date.parse("2026-06-20T00:00:00.000Z"));
+    assert.deepEqual(
+      kept.map((i) => i.id),
+      ["old", "new"],
+    );
+  });
+});
+
 describe("feeds — ?since= filter", () => {
   test("a future since yields an empty but valid feed (200)", async () => {
     const { res, text } = await feed(
@@ -508,6 +537,63 @@ describe("feeds — ?since= filter", () => {
       );
       assert.equal(res.status, 400, value);
     }
+  });
+});
+
+describe("feeds — ?until= filter", () => {
+  test("an until before all items yields an empty but valid feed (200)", async () => {
+    const { res, text } = await feed(
+      "/api/v1/feeds/registry.json?until=2026-01-01",
+    );
+    assert.equal(res.status, 200);
+    assert.deepEqual(JSON.parse(text).items, []);
+  });
+
+  test("a future until keeps items and composes with ?tag=", async () => {
+    const { res, text } = await feed(
+      "/api/v1/feeds/registry.json?until=2030-01-01&tag=registry",
+    );
+    assert.equal(res.status, 200);
+    const items = JSON.parse(text).items;
+    assert.ok(items.length > 0);
+    assert.ok(items.every((it) => (it.tags || []).includes("registry")));
+  });
+
+  test("since and until bound a window inclusively", async () => {
+    const { res, text } = await feed(
+      "/api/v1/feeds/registry.json?since=2026-06-15&until=2026-06-15",
+    );
+    assert.equal(res.status, 200);
+    const items = JSON.parse(text).items;
+    assert.ok(items.length > 0);
+    for (const it of items) {
+      const t = Date.parse(it.date_published);
+      assert.ok(t >= Date.parse("2026-06-15T00:00:00.000Z"));
+      assert.ok(t <= Date.parse("2026-06-15T00:00:00.000Z"));
+    }
+  });
+
+  test("a malformed until is rejected with 400", async () => {
+    for (const value of [
+      "notadate",
+      "1",
+      "2026-02-31",
+      "Tue, 01 Jun 2026 00:00:00 GMT",
+    ]) {
+      const { res } = await feed(
+        `/api/v1/feeds/registry.json?until=${encodeURIComponent(value)}`,
+      );
+      assert.equal(res.status, 400, value);
+    }
+  });
+
+  test("since after until is rejected with 400 invalid_query", async () => {
+    const { res, text } = await feed(
+      "/api/v1/feeds/registry.json?since=2026-07-01&until=2026-06-01",
+    );
+    assert.equal(res.status, 400);
+    const body = JSON.parse(text);
+    assert.equal(body.error.code, "invalid_query");
   });
 });
 
@@ -987,7 +1073,7 @@ describe("feeds — Worker dispatch integration", () => {
     assert.equal(recentChecksQueries, 1);
   });
 
-  test("handleRequest keys edge-cached feeds by since", async () => {
+  test("handleRequest keys edge-cached feeds by since and until", async () => {
     installMockCache();
     let recentChecksQueries = 0;
     const env = {
@@ -1062,6 +1148,41 @@ describe("feeds — Worker dispatch integration", () => {
     assert.equal(
       invalid.headers.get("x-metagraph-error-code"),
       "invalid_since",
+    );
+
+    const untilFuture = await handleRequest(
+      new Request(
+        "https://api.metagraph.sh/api/v1/feeds/incidents.json?until=2099-01-01",
+      ),
+      env,
+      ctx,
+    );
+    assert.equal(untilFuture.status, 200);
+    assert.ok((await untilFuture.json()).items.length > 0);
+    assert.equal(recentChecksQueries, 3);
+
+    const untilPast = await handleRequest(
+      new Request(
+        "https://api.metagraph.sh/api/v1/feeds/incidents.json?until=2000-01-01",
+      ),
+      env,
+      ctx,
+    );
+    assert.equal(untilPast.status, 200);
+    assert.deepEqual((await untilPast.json()).items, []);
+    assert.equal(recentChecksQueries, 4);
+
+    const invalidUntil = await handleRequest(
+      new Request(
+        "https://api.metagraph.sh/api/v1/feeds/incidents.json?until=notadate",
+      ),
+      env,
+      ctx,
+    );
+    assert.equal(invalidUntil.status, 400);
+    assert.equal(
+      invalidUntil.headers.get("x-metagraph-error-code"),
+      "invalid_until",
     );
   });
 
