@@ -30,6 +30,7 @@ import {
   parseConcentrationHistoryWindow,
 } from "./concentration.mjs";
 import { loadChainSigners } from "./chain-query-loaders.mjs";
+import { loadRpcUsage } from "./rpc-usage-loader.mjs";
 import {
   loadCounterparties,
   loadCounterpartyRelationship,
@@ -40,6 +41,7 @@ import {
   loadGlobalIncidents,
   loadRegistryLeaderboards,
   loadSubnetHealthTrends,
+  loadSubnetPercentiles,
   loadSubnetUptime,
   parseAnalyticsWindow,
   parseCompareDimensionList,
@@ -132,7 +134,7 @@ const MCP_LATEST_PROTOCOL = MCP_PROTOCOL_VERSIONS[0];
 //   - change or remove a tool's I/O       → MAJOR
 //   - behavioral-only fix (no I/O change) → PATCH
 // Reported in serverInfo.version (initialize) + the generated server-card.json.
-export const MCP_SERVER_VERSION = "1.10.0";
+export const MCP_SERVER_VERSION = "1.11.0";
 
 export const MCP_SERVER_INFO = {
   name: "metagraphed",
@@ -188,7 +190,9 @@ export const MCP_INSTRUCTIONS =
   "participation, get_subnet_economics returns a subnet's registration cost, " +
   "open slots, stake, emission split and validator/miner counts, " +
   "get_subnet_trajectory its week-over-week trend, get_subnet_uptime its " +
-  "long-term surface uptime history, get_subnet_concentration stake and " +
+  "long-term surface uptime history, get_subnet_health_percentiles its " +
+  "per-surface p50/p95/p99 request-latency distribution, " +
+  "get_subnet_concentration stake and " +
   "emission decentralization metrics (Gini, HHI, Nakamoto), " +
   "get_subnet_concentration_history the decentralization trend over time, " +
   "get_subnet_turnover validator-set and registration churn between two " +
@@ -196,7 +200,9 @@ export const MCP_INSTRUCTIONS =
   "cross-subnet health/economics boards, compare_subnets a side-by-side view " +
   "across structure/economics/health, get_global_incidents recent cross-subnet " +
   "probe failures, get_chain_signers the windowed most-active-account " +
-  "leaderboard (extrinsic counts + fees), get_subnet_metagraph the " +
+  "leaderboard (extrinsic counts + fees), get_rpc_usage the RPC reverse-proxy " +
+  "usage analytics (request volume, latency, failover, cache hits, per-endpoint " +
+  "distribution) over a 7d/30d window, get_subnet_metagraph the " +
   "per-UID neuron snapshot (validator_permit filters to validators), " +
   "list_subnet_validators its validators ranked by stake, and get_neuron one " +
   "UID — use these to decide where to mine or validate. For wallet lookup, " +
@@ -1370,6 +1376,42 @@ export const MCP_TOOLS = [
     async handler(args, ctx) {
       const netuid = requireNetuid(args);
       return loadSubnetHealthTrends(mcpD1Runner(ctx), netuid, {
+        observedAt: await mcpObservedAt(ctx),
+      });
+    },
+  },
+  {
+    name: "get_subnet_health_percentiles",
+    title: "Get subnet latency percentiles",
+    description:
+      "Fetch one subnet's request-latency percentiles per operational surface over " +
+      "a 7d or 30d window, from the live health-probe history: p50/p95/p99 plus " +
+      "avg/min/max latency in ms and the healthy-sample count behind them. Use it " +
+      "to see a surface's latency distribution and tail behavior, where " +
+      "get_subnet_health_trends gives the uptime+latency trend and get_subnet_health " +
+      "the current status. Mirrors GET /api/v1/subnets/{netuid}/health/percentiles.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        netuid: { type: "integer", description: "Subnet netuid.", minimum: 0 },
+        window: {
+          type: "string",
+          enum: ["7d", "30d"],
+          description: "Lookback window (default 7d).",
+        },
+      },
+      required: ["netuid"],
+      additionalProperties: false,
+    },
+    async handler(args, ctx) {
+      const netuid = requireNetuid(args);
+      const parsed = parseAnalyticsWindow(args?.window ?? "7d");
+      if (args?.window !== undefined && parsed === null) {
+        throw toolError("invalid_params", "window must be one of: 7d, 30d.");
+      }
+      const { label } = parsed;
+      return loadSubnetPercentiles(mcpD1Runner(ctx), netuid, {
+        window: label,
         observedAt: await mcpObservedAt(ctx),
       });
     },
@@ -2813,6 +2855,41 @@ export const MCP_TOOLS = [
     },
   },
   {
+    name: "get_rpc_usage",
+    title: "Get RPC reverse-proxy usage analytics",
+    description:
+      "Fetch RPC reverse-proxy usage analytics over a 7d or 30d window: total " +
+      "request volume, error and failover rates, cache-hit rate, latency p50/p95 " +
+      "and average, per-endpoint request distribution, per-network breakdown, " +
+      "and bounded time buckets (1h for 7d, 6h for 30d). Computed live from the " +
+      "rpc_proxy_events D1 telemetry. Use alongside get_best_rpc_endpoint to see " +
+      "which endpoints are actually carrying traffic. Mirrors " +
+      "GET /api/v1/rpc/usage.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        window: {
+          type: "string",
+          enum: ["7d", "30d"],
+          description: "Aggregation window (default 7d).",
+        },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    async handler(args, ctx) {
+      const parsed = parseAnalyticsWindow(args?.window ?? "7d");
+      if (args?.window !== undefined && parsed === null) {
+        throw toolError("invalid_params", "window must be one of: 7d, 30d.");
+      }
+      const { label } = parsed;
+      return loadRpcUsage(mcpD1Runner(ctx), {
+        window: label,
+        observedAt: await mcpObservedAt(ctx),
+      });
+    },
+  },
+  {
     name: "get_best_rpc_endpoint",
     title: "Get the best Bittensor RPC endpoint",
     description:
@@ -3455,6 +3532,79 @@ const EXTRINSIC_ITEM = {
   tip_tao: ANY,
   observed_at: NULLABLE_STRING,
 };
+// RpcUsageArtifact item shapes — shared by get_rpc_usage outputSchema (mirrors
+// schemas/api-components.schema.json#/components/schemas/RpcUsageArtifact).
+const RPC_USAGE_LATENCY_MS = {
+  type: "object",
+  additionalProperties: true,
+  required: ["p50", "p95", "avg"],
+  properties: {
+    p50: NULLABLE_INT,
+    p95: NULLABLE_INT,
+    avg: NULLABLE_INT,
+  },
+};
+const RPC_USAGE_SUMMARY = {
+  type: "object",
+  additionalProperties: true,
+  required: ["total_requests", "ok_requests", "error_requests", "latency_ms"],
+  properties: {
+    total_requests: { type: "integer", minimum: 0 },
+    ok_requests: { type: "integer", minimum: 0 },
+    error_requests: { type: "integer", minimum: 0 },
+    error_rate: { type: ["number", "null"] },
+    failover_requests: { type: "integer", minimum: 0 },
+    failover_rate: { type: ["number", "null"] },
+    cache_hits: { type: "integer", minimum: 0 },
+    cache_hit_rate: { type: ["number", "null"] },
+    latency_ms: RPC_USAGE_LATENCY_MS,
+  },
+};
+const RPC_USAGE_ENDPOINTS = {
+  type: "array",
+  items: {
+    type: "object",
+    additionalProperties: true,
+    required: ["endpoint_id", "requests", "ok_requests"],
+    properties: {
+      rank: { type: "integer", minimum: 1 },
+      endpoint_id: NULLABLE_STRING,
+      provider: NULLABLE_STRING,
+      requests: { type: "integer", minimum: 0 },
+      ok_requests: { type: "integer", minimum: 0 },
+      error_rate: { type: ["number", "null"] },
+      avg_latency_ms: NULLABLE_INT,
+    },
+  },
+};
+const RPC_USAGE_NETWORKS = {
+  type: "array",
+  items: {
+    type: "object",
+    additionalProperties: true,
+    required: ["network", "requests", "ok_requests"],
+    properties: {
+      network: { type: "string" },
+      requests: { type: "integer", minimum: 0 },
+      ok_requests: { type: "integer", minimum: 0 },
+      error_rate: { type: ["number", "null"] },
+    },
+  },
+};
+const RPC_USAGE_BUCKETS = {
+  type: "array",
+  items: {
+    type: "object",
+    additionalProperties: true,
+    required: ["ts", "requests", "errors", "avg_latency_ms"],
+    properties: {
+      ts: { type: "integer", minimum: 0 },
+      requests: { type: "integer", minimum: 0 },
+      errors: { type: "integer", minimum: 0 },
+      avg_latency_ms: NULLABLE_INT,
+    },
+  },
+};
 const TOOL_OUTPUT_SCHEMAS = {
   search_subnets: {
     type: "object",
@@ -3593,6 +3743,34 @@ const TOOL_OUTPUT_SCHEMAS = {
       observed_at: NULLABLE_STRING,
       source: NULLABLE_STRING,
       windows: { type: "object" },
+    },
+  },
+  get_subnet_health_percentiles: {
+    type: "object",
+    additionalProperties: true,
+    required: ["netuid", "surfaces"],
+    properties: {
+      schema_version: { type: "integer" },
+      netuid: { type: "integer" },
+      window: NULLABLE_STRING,
+      observed_at: NULLABLE_STRING,
+      source: NULLABLE_STRING,
+      surfaces: objectItems({
+        surface_id: NULLABLE_STRING,
+        samples: { type: "integer" },
+        latency_ms: {
+          type: "object",
+          additionalProperties: true,
+          properties: {
+            p50: NULLABLE_INT,
+            p95: NULLABLE_INT,
+            p99: NULLABLE_INT,
+            avg: NULLABLE_INT,
+            min: NULLABLE_INT,
+            max: NULLABLE_INT,
+          },
+        },
+      }),
     },
   },
   get_subnet_economics: {
@@ -4069,6 +4247,29 @@ const TOOL_OUTPUT_SCHEMAS = {
         total_tip_tao: { type: ["number", "null"] },
         last_tx_block: NULLABLE_INT,
       }),
+    },
+  },
+  get_rpc_usage: {
+    type: "object",
+    additionalProperties: true,
+    required: [
+      "schema_version",
+      "source",
+      "summary",
+      "endpoints",
+      "networks",
+      "buckets",
+    ],
+    properties: {
+      schema_version: { type: "integer" },
+      window: NULLABLE_STRING,
+      bucket_granularity: NULLABLE_STRING,
+      observed_at: NULLABLE_STRING,
+      source: { type: "string" },
+      summary: RPC_USAGE_SUMMARY,
+      endpoints: RPC_USAGE_ENDPOINTS,
+      networks: RPC_USAGE_NETWORKS,
+      buckets: RPC_USAGE_BUCKETS,
     },
   },
   list_subnet_apis: {

@@ -147,6 +147,20 @@ describe("MCP tool registry", () => {
     assert.ok(pointProperties?.emission_top_10pct_share);
   });
 
+  test("get_rpc_usage advertises a typed RpcUsageArtifact-shaped outputSchema", () => {
+    const def = listToolDefinitions().find((t) => t.name === "get_rpc_usage");
+    assert.ok(def);
+    const summary = def.outputSchema?.properties?.summary?.properties;
+    assert.ok(summary?.total_requests);
+    assert.ok(summary?.latency_ms?.properties?.p50);
+    const endpoint = def.outputSchema?.properties?.endpoints?.items?.properties;
+    assert.ok(endpoint?.endpoint_id);
+    assert.ok(endpoint?.error_rate);
+    const bucket = def.outputSchema?.properties?.buckets?.items?.properties;
+    assert.ok(bucket?.ts);
+    assert.ok(bucket?.avg_latency_ms);
+  });
+
   test("every advertised tool description carries the untrusted-data note", () => {
     for (const def of listToolDefinitions()) {
       assert.match(
@@ -1722,6 +1736,121 @@ describe("MCP get_chain_signers", () => {
     const out = res.body.result.structuredContent;
     assert.equal(out.signer_count, 0);
     assert.deepEqual(out.signers, []);
+  });
+});
+
+describe("MCP get_rpc_usage", () => {
+  function rpcUsageDb() {
+    return {
+      METAGRAPH_HEALTH_DB: {
+        prepare(sql) {
+          return {
+            bind(..._params) {
+              return {
+                async all() {
+                  if (/COUNT\(\*\) AS total/.test(sql)) {
+                    return {
+                      results: [
+                        {
+                          total: 50,
+                          ok_count: 48,
+                          failover_count: 2,
+                          cache_hits: 10,
+                          avg_latency_ms: 80,
+                        },
+                      ],
+                    };
+                  }
+                  if (/ROW_NUMBER\(\) OVER/.test(sql)) {
+                    return { results: [{ p50: 70, p95: 200 }] };
+                  }
+                  if (/GROUP BY endpoint_id/.test(sql)) {
+                    return {
+                      results: [
+                        {
+                          endpoint_id: "a",
+                          provider: "p",
+                          requests: 50,
+                          ok_count: 48,
+                          avg_latency_ms: 80,
+                        },
+                      ],
+                    };
+                  }
+                  if (/GROUP BY network/.test(sql)) {
+                    return {
+                      results: [
+                        { network: "finney", requests: 50, ok_count: 48 },
+                      ],
+                    };
+                  }
+                  if (/GROUP BY ts/.test(sql)) {
+                    return {
+                      results: [
+                        {
+                          ts: 1_700_000_000_000,
+                          requests: 5,
+                          errors: 0,
+                          avg_latency_ms: 75,
+                        },
+                      ],
+                    };
+                  }
+                  return { results: [] };
+                },
+              };
+            },
+          };
+        },
+      },
+    };
+  }
+
+  test("returns usage analytics from rpc_proxy_events", async () => {
+    const res = await callTool(
+      "get_rpc_usage",
+      { window: "7d" },
+      { env: rpcUsageDb() },
+    );
+    const out = res.body.result.structuredContent;
+    assert.equal(out.window, "7d");
+    assert.equal(out.summary.total_requests, 50);
+    assert.equal(out.endpoints[0].endpoint_id, "a");
+    assert.equal(out.networks[0].network, "finney");
+    assert.equal(out.buckets.length, 1);
+  });
+
+  test("rejects an invalid window", async () => {
+    const res = await callTool("get_rpc_usage", { window: "99d" }, {});
+    assert.equal(res.body.result.isError, true);
+    assert.match(res.body.result.content[0].text, /window/i);
+  });
+
+  test("returns a cold-stable zeroed payload on empty D1", async () => {
+    const res = await callTool("get_rpc_usage", {}, {});
+    const out = res.body.result.structuredContent;
+    assert.equal(out.window, "7d");
+    assert.equal(out.summary.total_requests, 0);
+    assert.deepEqual(out.endpoints, []);
+    assert.deepEqual(out.buckets, []);
+  });
+
+  test("cold and populated payloads validate against the declared outputSchema", async () => {
+    const ajv = new Ajv2020({ strict: false });
+    const validate = ajv.compile(
+      listToolDefinitions().find((t) => t.name === "get_rpc_usage")
+        .outputSchema,
+    );
+    for (const [label, env] of [
+      ["cold", {}],
+      ["populated", rpcUsageDb()],
+    ]) {
+      const res = await callTool("get_rpc_usage", { window: "7d" }, { env });
+      assert.ok(
+        validate(res.body.result.structuredContent),
+        `${label}: ${JSON.stringify(validate.errors)}`,
+      );
+    }
   });
 });
 
@@ -4172,6 +4301,58 @@ describe("MCP economics + metagraph data tools", () => {
       assert.equal(out.windows[label].surfaces[0].surface_id, "api-root");
       assert.equal(out.windows[label].surfaces[0].uptime_ratio, 0.95);
     }
+  });
+
+  test("get_subnet_health_percentiles shapes per-surface latency percentiles from ranked rows", async () => {
+    const env = {
+      METAGRAPH_HEALTH_DB: metagraphD1({
+        incidentRows: [
+          {
+            surface_id: "api-root",
+            surface_key: "api-root",
+            latency_samples: 95,
+            p50: 80,
+            p95: 110,
+            p99: 130,
+            avg_latency_ms: 90,
+            min_latency_ms: 40,
+            max_latency_ms: 200,
+          },
+        ],
+      }),
+    };
+    const deps = makeDeps({}, { "health:meta": { last_run_at: FRESH_RUN } });
+    const res = await callTool(
+      "get_subnet_health_percentiles",
+      { netuid: 7, window: "30d" },
+      { deps, env },
+    );
+    const out = res.body.result.structuredContent;
+    assert.equal(out.netuid, 7);
+    assert.equal(out.window, "30d");
+    assert.equal(out.observed_at, FRESH_RUN);
+    assert.equal(out.surfaces[0].surface_id, "api-root");
+    assert.equal(out.surfaces[0].samples, 95);
+    assert.equal(out.surfaces[0].latency_ms.p95, 110);
+    assert.equal(out.surfaces[0].latency_ms.max, 200);
+  });
+
+  test("get_subnet_health_percentiles returns schema-stable empty surfaces (default 7d) on cold D1", async () => {
+    const res = await callTool("get_subnet_health_percentiles", { netuid: 7 });
+    const out = res.body.result.structuredContent;
+    assert.equal(res.body.result.isError, false);
+    assert.equal(out.window, "7d");
+    assert.deepEqual(out.surfaces, []);
+  });
+
+  test("get_subnet_health_percentiles rejects an invalid window", async () => {
+    const res = await callTool(
+      "get_subnet_health_percentiles",
+      { netuid: 7, window: "99d" },
+      {},
+    );
+    assert.equal(res.body.result.isError, true);
+    assert.match(res.body.result.content[0].text, /window/);
   });
 
   test("get_registry_leaderboards can filter to one board", async () => {
