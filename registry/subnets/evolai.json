@@ -95,7 +95,7 @@
       "id": "sn-47-evolai-subnet-api",
       "kind": "subnet-api",
       "name": "EvolAI Proxy API (datasets)",
-      "notes": "Public read endpoint on the EvolAI-operated Hugging Face Space proxy API. Also exposes GET /evaluations/rankings; validator-only routes require Bittensor hotkey signatures.",
+      "notes": "Public read endpoint on the EvolAI-operated Hugging Face Space proxy API. The Space README documents GET /datasets and GET /evaluations/rankings on https://evolai-gate.hf.space.",
       "probe": {
         "enabled": true,
         "expect": "json",
@@ -110,8 +110,8 @@
         "submitted_by": "claytonlin1110"
       },
       "source_urls": [
-        "https://huggingface.co/spaces/evolai/gate",
-        "https://huggingface.co/spaces/evolai/gate/blob/main/README.md"
+        "https://huggingface.co/spaces/evolai/gate/raw/main/README.md",
+        "https://huggingface.co/spaces/evolai/gate"
       ],
       "url": "https://evolai-gate.hf.space/datasets"
     }
