@@ -74,6 +74,7 @@ import {
   canonicalSubnetTurnoverCachePath,
   handleSubnetStakeFlow,
   canonicalSubnetStakeFlowCachePath,
+  handleSubnetYield,
   handleSubnetMovers,
   canonicalSubnetMoversCachePath,
   handleGlobalValidators,
@@ -251,6 +252,7 @@ import {
   SUBNET_CONCENTRATION_HISTORY_PATH_PATTERN,
   SUBNET_TURNOVER_PATH_PATTERN,
   SUBNET_STAKE_FLOW_PATH_PATTERN,
+  SUBNET_YIELD_PATH_PATTERN,
   TRENDS_PATH_PATTERN,
   UPTIME_PATH_PATTERN,
   WEBHOOK_SUBSCRIPTION_TOKEN_HEADER,
@@ -850,7 +852,16 @@ async function handleChainEventsProxy(request, env, url) {
       503,
     );
   }
-  const upstream = await env.DATA_API.fetch(request);
+  // DATA_API is GET-only (it 405s any other method), so a HEAD probe must be
+  // forwarded as a GET or it would return a 405 error envelope instead of the
+  // bodiless 200 that HEAD yields on every other GET route (and that this route's
+  // own CORS preflight advertises). envelopeResponse(request, …) below still
+  // strips the body for HEAD, so the client gets the correct empty 200.
+  const upstream = await env.DATA_API.fetch(
+    request.method === "HEAD"
+      ? new Request(request.url, { method: "GET", headers: request.headers })
+      : request,
+  );
   let body;
   try {
     body = await upstream.json();
@@ -1345,6 +1356,17 @@ export async function handleRequest(request, env = {}, ctx = {}) {
             resolved.url,
           ),
         canonicalSubnetStakeFlowCachePath(resolved.url),
+      );
+    }
+    // Per-UID emission yield distribution over the current neurons snapshot — computed
+    // live from the neurons D1 tier, like the sibling metagraph route.
+    const yieldMatch = SUBNET_YIELD_PATH_PATTERN.exec(resolved.url.pathname);
+    if (yieldMatch) {
+      return handleSubnetYield(
+        request,
+        env,
+        Number(yieldMatch[1]),
+        resolved.url,
       );
     }
     // Per-UID metagraph (#1304/#1305): computed live from the neurons D1 tier.
