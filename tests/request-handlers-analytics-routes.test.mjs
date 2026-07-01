@@ -18,7 +18,10 @@ import {
   handleTrajectory,
   handleUptime,
 } from "../workers/request-handlers/analytics-routes.mjs";
-import { unsupportedWindowMessage, HISTORY_WINDOWS } from "../src/neuron-history.mjs";
+import {
+  unsupportedWindowMessage,
+  HISTORY_WINDOWS,
+} from "../src/neuron-history.mjs";
 import { UPTIME_WINDOWS } from "../workers/config.mjs";
 
 const NETUID = 7;
