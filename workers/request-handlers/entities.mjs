@@ -53,6 +53,7 @@ import {
   buildNeuronHistory,
   buildSubnetHistory,
   parseHistoryWindow,
+  unsupportedWindowMessage,
   NEURON_DAILY_READ_COLUMNS,
   MAX_HISTORY_POINTS,
 } from "../../src/neuron-history.mjs";
@@ -561,9 +562,7 @@ export async function handleSubnetStakeFlow(request, env, netuid, url) {
   if (!Object.hasOwn(STAKE_FLOW_WINDOWS, windowParam)) {
     return analyticsQueryError({
       parameter: "window",
-      message: `"${windowParam}" is not a supported window. Supported: ${Object.keys(
-        STAKE_FLOW_WINDOWS,
-      ).join(", ")}.`,
+      message: unsupportedWindowMessage(windowParam, STAKE_FLOW_WINDOWS),
     });
   }
   const { data, generatedAt } = await loadSubnetStakeFlow(
@@ -603,9 +602,7 @@ export async function handleSubnetMovers(request, env, url) {
   if (!Object.hasOwn(MOVERS_WINDOWS, windowParam)) {
     return analyticsQueryError({
       parameter: "window",
-      message: `"${windowParam}" is not a supported window. Supported: ${Object.keys(
-        MOVERS_WINDOWS,
-      ).join(", ")}.`,
+      message: unsupportedWindowMessage(windowParam, MOVERS_WINDOWS),
     });
   }
   const sortParam = url.searchParams.get("sort") || DEFAULT_MOVERS_SORT;
@@ -670,9 +667,7 @@ export async function handleAccountStakeFlow(request, env, ss58, url) {
   if (!Object.hasOwn(STAKE_FLOW_WINDOWS, windowParam)) {
     return analyticsQueryError({
       parameter: "window",
-      message: `"${windowParam}" is not a supported window. Supported: ${Object.keys(
-        STAKE_FLOW_WINDOWS,
-      ).join(", ")}.`,
+      message: unsupportedWindowMessage(windowParam, STAKE_FLOW_WINDOWS),
     });
   }
   const { data, generatedAt } = await loadAccountStakeFlow(
