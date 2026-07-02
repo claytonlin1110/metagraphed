@@ -41,10 +41,7 @@ test("contractStaleness returns null when builtUnder matches or exceeds live", (
   const live = (v) => ({ METAGRAPH_CONTRACT_VERSION: v });
   assert.equal(contractStaleness(live("2026-06-06.1"), "2026-06-06.1"), null);
   assert.equal(contractStaleness(live("2026-06-06.1"), "2026-06-07.1"), null);
-  assert.equal(
-    contractStaleness(live("2026-06-06.10"), "2026-06-06.11"),
-    null,
-  );
+  assert.equal(contractStaleness(live("2026-06-06.10"), "2026-06-06.11"), null);
 });
 
 test("contractStaleness compares revisions numerically on the same date", () => {
