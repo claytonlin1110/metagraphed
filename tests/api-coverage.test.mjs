@@ -917,10 +917,15 @@ describe("review enrichment list CSV export", () => {
     assert.match(res.headers.get("content-type"), /^text\/csv/);
     const lines = (await res.text()).split("\r\n");
     const header = lines[0].split(",");
-    const rows = lines.slice(1).filter(Boolean).map((line) => {
-      const values = line.split(",");
-      return Object.fromEntries(header.map((name, index) => [name, values[index]]));
-    });
+    const rows = lines
+      .slice(1)
+      .filter(Boolean)
+      .map((line) => {
+        const values = line.split(",");
+        return Object.fromEntries(
+          header.map((name, index) => [name, values[index]]),
+        );
+      });
     return { header, rows, lines };
   };
 
@@ -935,7 +940,9 @@ describe("review enrichment list CSV export", () => {
     const { header, rows } = await parseCsv(res);
     assert.equal(header.join(","), "netuid,priority_score,curation_level");
     assert.ok(rows.length > 0);
-    assert.ok(rows.every((row) => row.curation_level === "candidate-discovered"));
+    assert.ok(
+      rows.every((row) => row.curation_level === "candidate-discovered"),
+    );
     assert.ok(rows.every((row) => /^\d+$/.test(row.netuid)));
     assert.ok(rows.every((row) => row.priority_score !== ""));
   });
