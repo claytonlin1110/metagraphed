@@ -370,7 +370,9 @@ class NeuronDeregisteredExtractorTest(unittest.TestCase):
 class AxonInfoRemovedExtractorTest(unittest.TestCase):
     """Tests for SubtensorModule.AxonInfoRemoved (#2555).
 
-    [netuid, hotkey] positional tuple — same shape as AxonServed.
+    [netuid, hotkey] positional tuple — same shape as AxonServed. Variant name
+    pinned per issue #2555; absent from finney spec-424 metadata as of 2026-07-03
+    (see PR body) — extractor is forward-compat until upstream ships the event.
     """
 
     def test_positional_netuid_hotkey(self):
