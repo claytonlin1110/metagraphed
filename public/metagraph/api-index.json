@@ -2849,6 +2849,17 @@
               "desc"
             ]
           }
+        },
+        {
+          "description": "Response format override. Use `csv` to download the transformed list as text/csv; `json` keeps the default response envelope.",
+          "name": "format",
+          "schema": {
+            "enum": [
+              "json",
+              "csv"
+            ],
+            "type": "string"
+          }
         }
       ]
     },
@@ -3085,6 +3096,17 @@
               "desc"
             ]
           }
+        },
+        {
+          "description": "Response format override. Use `csv` to download the transformed list as text/csv; `json` keeps the default response envelope.",
+          "name": "format",
+          "schema": {
+            "enum": [
+              "json",
+              "csv"
+            ],
+            "type": "string"
+          }
         }
       ]
     },
@@ -3237,6 +3259,17 @@
               "asc",
               "desc"
             ]
+          }
+        },
+        {
+          "description": "Response format override. Use `csv` to download the transformed list as text/csv; `json` keeps the default response envelope.",
+          "name": "format",
+          "schema": {
+            "enum": [
+              "json",
+              "csv"
+            ],
+            "type": "string"
           }
         }
       ]
@@ -3466,6 +3499,17 @@
               "asc",
               "desc"
             ]
+          }
+        },
+        {
+          "description": "Response format override. Use `csv` to download the transformed list as text/csv; `json` keeps the default response envelope.",
+          "name": "format",
+          "schema": {
+            "enum": [
+              "json",
+              "csv"
+            ],
+            "type": "string"
           }
         }
       ]
