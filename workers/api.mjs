@@ -120,6 +120,7 @@ import {
   canonicalCompareCachePath,
   canonicalEconomicsTrendsCachePath,
   canonicalLeaderboardsCachePath,
+  canonicalTrajectoryCachePath,
   canonicalUptimeCachePath,
   configureAnalyticsRoutes,
   handleCompare,
@@ -1304,13 +1305,19 @@ export async function handleRequest(request, env = {}, ctx = {}) {
     }
     const trajectoryMatch = TRAJECTORY_PATH_PATTERN.exec(resolved.url.pathname);
     if (trajectoryMatch) {
-      return withEdgeCache(request, ctx, env, "trajectory", () =>
-        handleTrajectory(
-          request,
-          env,
-          Number(trajectoryMatch[1]),
-          resolved.url,
-        ),
+      return withEdgeCache(
+        request,
+        ctx,
+        env,
+        "trajectory",
+        () =>
+          handleTrajectory(
+            request,
+            env,
+            Number(trajectoryMatch[1]),
+            resolved.url,
+          ),
+        canonicalTrajectoryCachePath(resolved.url, request),
       );
     }
     const uptimeMatch = UPTIME_PATH_PATTERN.exec(resolved.url.pathname);
