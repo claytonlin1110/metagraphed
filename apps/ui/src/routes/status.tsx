@@ -395,9 +395,7 @@ function IncidentsFeedSubscribe() {
   return (
     <div className="space-y-3">
       <div className="rounded border border-border bg-card p-3 space-y-3">
-        {feed?.description ? (
-          <p className="text-sm text-ink-muted">{feed.description}</p>
-        ) : null}
+        {feed?.description ? <p className="text-sm text-ink-muted">{feed.description}</p> : null}
         <div className="space-y-2">
           {INCIDENTS_FEED_FORMATS.map(({ label, suffix }) => {
             const path = `${INCIDENTS_FEED_BASE}${suffix}`;
@@ -414,9 +412,7 @@ function IncidentsFeedSubscribe() {
           })}
         </div>
       </div>
-      {items.length === 0 ? (
-        <EmptyState title="No incidents in feed" />
-      ) : null}
+      {items.length === 0 ? <EmptyState title="No incidents in feed" /> : null}
     </div>
   );
 }

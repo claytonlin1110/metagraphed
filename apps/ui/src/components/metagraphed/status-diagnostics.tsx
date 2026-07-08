@@ -298,7 +298,12 @@ function SurfaceHistoryRow({ surface }: { surface: HealthHistorySurface }) {
  * ================================================================== */
 
 type ProviderSortField =
-  "name" | "kind" | "status" | "endpoint_count" | "candidate_count" | "verification_result_count";
+  | "name"
+  | "kind"
+  | "status"
+  | "endpoint_count"
+  | "candidate_count"
+  | "verification_result_count";
 
 export function SourceHealthTable() {
   const { data: res } = useSuspenseQuery(sourceHealthProvidersQuery());
