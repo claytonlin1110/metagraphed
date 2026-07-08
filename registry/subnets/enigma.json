@@ -84,6 +84,25 @@
         "https://www.qbittensorlabs.com/"
       ],
       "url": "https://www.qbittensorlabs.com/api/health"
+    },
+    {
+      "auth_required": false,
+      "authority": "community",
+      "id": "sn-63-enigma-min-compute-spec",
+      "kind": "data-artifact",
+      "name": "Enigma minimum compute requirements",
+      "notes": "Public no-auth YAML miner and validator minimum hardware specification published at the root of the official qbittensor-labs/enigma repository as min_compute.yml. Documents SN63 operator CPU/GPU/memory/storage/network floors.",
+      "provider": "qbittensor-labs",
+      "public_safe": true,
+      "review": {
+        "state": "community-submitted",
+        "submitted_by": "galuis116"
+      },
+      "source_urls": [
+        "https://github.com/qbittensor-labs/enigma/blob/main/min_compute.yml",
+        "https://github.com/qbittensor-labs/enigma"
+      ],
+      "url": "https://raw.githubusercontent.com/qbittensor-labs/enigma/main/min_compute.yml"
     }
   ],
   "social": {
