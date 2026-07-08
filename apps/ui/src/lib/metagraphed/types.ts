@@ -2039,6 +2039,40 @@ export interface ChainStakeTransfers {
   subnets: ChainStakeTransferSubnet[];
 }
 
+/** One subnet's row on the network-wide weight-setting leaderboard (#3469). */
+export interface ChainWeightsSubnet {
+  netuid: number;
+  distinct_setters: number;
+  weight_sets: number;
+  sets_per_setter: number | null;
+}
+
+/** Network-wide weight-setting rollup — true distinct-setter count (not a per-subnet sum) + total weight-sets. */
+export interface ChainWeightsNetwork {
+  distinct_setters: number;
+  weight_sets: number;
+  sets_per_setter: number | null;
+}
+
+/**
+ * Network-wide validator weight-setting leaderboard over a 7d/30d window
+ * (#3469), from GET /api/v1/chain/weights — subnets ranked by WeightsSet
+ * event count, distinct setters, and sets per setter, plus the true
+ * network-wide distinct-setter rollup and a distribution summary of the
+ * per-subnet update intensity. The account_events kind-filtered sibling of
+ * /api/v1/chain/stake-transfers. Zeroed with an empty subnets list when the
+ * store is cold.
+ */
+export interface ChainWeights {
+  schema_version: number;
+  window: string | null;
+  observed_at: string | null;
+  subnet_count: number;
+  network: ChainWeightsNetwork;
+  intensity_distribution: ChainIntensityDistribution | null;
+  subnets: ChainWeightsSubnet[];
+}
+
 /** Network-wide stake/emission concentration from GET /api/v1/chain/concentration. */
 export interface ChainConcentration {
   schema_version: number;

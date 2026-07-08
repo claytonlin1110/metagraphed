@@ -67,6 +67,8 @@ import type {
   ChainStakeTransfers,
   ChainStakeTransferSubnet,
   ChainIntensityDistribution,
+  ChainWeights,
+  ChainWeightsSubnet,
   ChainConcentration,
   ChainPerformance,
   ChainSigners,
@@ -210,6 +212,7 @@ const MAX_CHAIN_FEE_DAYS = 31;
 const MAX_CHAIN_FEE_PAYERS = 12;
 const MAX_CHAIN_TRANSFER_PAIRS = 100;
 const MAX_CHAIN_STAKE_TRANSFERS = 100;
+const MAX_CHAIN_WEIGHTS = 100;
 
 function coerceFiniteNumber(value: unknown): number | undefined {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -3008,6 +3011,57 @@ export const chainStakeTransfersQuery = (window = "7d", limit = 20) =>
       });
       return {
         data: normalizeChainStakeTransfers(res.data),
+        meta: res.meta,
+        url: res.url,
+      };
+    },
+    staleTime: STALE_MED,
+  });
+
+function normalizeChainWeightsSubnet(raw: unknown): ChainWeightsSubnet | null {
+  if (!isRecord(raw)) return null;
+  const netuid = firstFiniteNumber(raw.netuid);
+  if (netuid == null) return null;
+  return {
+    netuid,
+    distinct_setters: firstFiniteNumber(raw.distinct_setters) ?? 0,
+    weight_sets: firstFiniteNumber(raw.weight_sets) ?? 0,
+    sets_per_setter: firstFiniteNumber(raw.sets_per_setter) ?? null,
+  };
+}
+
+// #3469: network-wide weight-setting leaderboard over a 7d/30d window — the
+// account_events kind-filtered sibling of /api/v1/chain/stake-transfers. Every
+// numeric cell coerces defensively: counts fall through to 0, averages to null
+// (never NaN), and malformed subnet rows are dropped on a cold store or junk.
+export function normalizeChainWeights(raw: unknown): ChainWeights {
+  const rec = isRecord(raw) ? raw : {};
+  const networkRec = isRecord(rec.network) ? rec.network : {};
+  return {
+    schema_version: firstFiniteNumber(rec.schema_version) ?? 1,
+    window: firstString(rec.window) ?? null,
+    observed_at: firstString(rec.observed_at) ?? null,
+    subnet_count: firstFiniteNumber(rec.subnet_count) ?? 0,
+    network: {
+      distinct_setters: firstFiniteNumber(networkRec.distinct_setters) ?? 0,
+      weight_sets: firstFiniteNumber(networkRec.weight_sets) ?? 0,
+      sets_per_setter: firstFiniteNumber(networkRec.sets_per_setter) ?? null,
+    },
+    intensity_distribution: normalizeChainIntensityDistribution(rec.intensity_distribution),
+    subnets: normalizeChainRows(rec.subnets, MAX_CHAIN_WEIGHTS, normalizeChainWeightsSubnet),
+  };
+}
+
+export const chainWeightsQuery = (window = "7d", limit = 20) =>
+  queryOptions({
+    queryKey: k("chain-weights", window, limit),
+    queryFn: async ({ signal }) => {
+      const res = await apiFetch<Partial<ChainWeights>>("/api/v1/chain/weights", {
+        params: { window, limit },
+        signal,
+      });
+      return {
+        data: normalizeChainWeights(res.data),
         meta: res.meta,
         url: res.url,
       };
