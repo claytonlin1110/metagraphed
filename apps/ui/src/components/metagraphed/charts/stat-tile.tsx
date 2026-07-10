@@ -59,7 +59,12 @@ export function StatTile({
           {eyebrow}
         </div>
         <div className="mt-1 flex min-w-0 items-baseline gap-1.5">
-          <span className="min-w-0 font-display text-base font-semibold tabular-nums leading-none text-ink-strong sm:text-xl md:text-2xl">
+          {/* #3940: shrink-0 so a long hint can't flex-shrink the value box
+              below its own content width -- without it, an unbreakable short
+              value (e.g. "24.85") still visibly overflows into the hint's
+              space once combined width exceeds the tile, since only the hint
+              (not the value) is truncate-clipped. */}
+          <span className="shrink-0 font-display text-base font-semibold tabular-nums leading-none text-ink-strong sm:text-xl md:text-2xl">
             {value}
           </span>
           {hint ? (

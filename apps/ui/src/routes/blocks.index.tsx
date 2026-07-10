@@ -172,9 +172,15 @@ function BlockProductionHeader() {
       <StatTile
         icon={Activity}
         eyebrow="Throughput"
-        value={throughput ? `${formatNumber(throughput.mean_extrinsics_per_block)} ext/block` : "—"}
+        // #3940: keep the value a bare number like the sibling tiles -- baking
+        // "ext/block" into it made the value itself wrap mid-word on narrow
+        // tiles. The unit + secondary metric both live in the (already
+        // truncating) hint instead.
+        value={throughput ? formatNumber(throughput.mean_extrinsics_per_block) : "—"}
         hint={
-          throughput ? `${formatNumber(throughput.mean_events_per_block)} events/block` : undefined
+          throughput
+            ? `ext/block · ${formatNumber(throughput.mean_events_per_block)} events/block`
+            : undefined
         }
       />
       <StatTile
