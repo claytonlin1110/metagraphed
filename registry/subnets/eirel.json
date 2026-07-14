@@ -187,6 +187,28 @@
       },
       "source_urls": ["https://api.eirel.ai/openapi.json", "https://eirel.ai/"],
       "url": "https://api.eirel.ai/v1/runs/current"
+    },
+    {
+      "auth_required": false,
+      "authority": "community",
+      "id": "sn-36-eirel-dashboard-families-api",
+      "kind": "subnet-api",
+      "name": "Eirel dashboard families API",
+      "notes": "Public no-auth GET /api/v1/dashboard/families on api.eirel.ai returning the JSON taxonomy of SN36 Eirel evaluation task families (each with id, label, weight, and active flag; e.g. general_chat) that the subnet's benchmark runs and leaderboards are organized around. Documented in the subnet's registered OpenAPI spec and served on the same host as the existing dashboard/overview and dashboard/runs surfaces. Verified 200 application/json, no auth, SS58-clean.",
+      "probe": {
+        "enabled": true,
+        "expect": "json",
+        "method": "GET",
+        "timeout_ms": 10000
+      },
+      "provider": "eirel",
+      "public_safe": true,
+      "review": {
+        "state": "community-submitted",
+        "submitted_by": "ultrahighsuper"
+      },
+      "source_urls": ["https://api.eirel.ai/openapi.json", "https://eirel.ai/"],
+      "url": "https://api.eirel.ai/api/v1/dashboard/families"
     }
   ],
   "social": {
