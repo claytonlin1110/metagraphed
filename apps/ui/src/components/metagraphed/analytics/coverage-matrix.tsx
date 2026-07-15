@@ -326,6 +326,7 @@ export function CompletenessHistogram() {
         preserveAspectRatio="none"
         className="block w-full"
         role="img"
+        aria-label="Completeness distribution across the registry"
       >
         {buckets.map((c, i) => {
           const x = PAD + i * colW;
