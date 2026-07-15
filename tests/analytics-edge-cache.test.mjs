@@ -194,6 +194,45 @@ describe("analytics edge cache", () => {
     assert.ok(key.includes("window=30d"), "window");
   });
 
+  // #5554: HEAD probes on the D1-aggregation routes must be normalized through
+  // the GET cache key so a HEAD-probe burst is served from the warm cache
+  // instead of re-running the full aggregation every call (matching the 12
+  // sibling routes). Before the fix these routes passed the raw HEAD request +
+  // a zero-arg builder to withEdgeCache, so `cache` resolved to null and every
+  // HEAD bypassed the cache and re-queried D1.
+  test("REGRESSION #5554: a HEAD request hits the warm edge cache without re-querying D1", async () => {
+    originalCaches = globalThis.caches;
+    const cache = mockCaches();
+    cache.install();
+    const queries = [];
+    const env = analyticsEnv(queries);
+    const target =
+      "https://api.metagraph.sh/api/v1/subnets/7/health/percentiles?window=30d";
+
+    // Warm the cache with a GET — a cold cache must touch D1 and store one entry.
+    const getRes = await handleRequest(new Request(target), env, ctx);
+    assert.equal(getRes.status, 200);
+    assert.equal(cache.putKeys.length, 1);
+    const queriesAfterGet = queries.length;
+    assert.ok(queriesAfterGet > 0, "cold GET should query D1");
+
+    // A HEAD probe against the warm entry must be served from cache: no new D1
+    // query, no re-put, a bodyless 200.
+    const headRes = await handleRequest(
+      new Request(target, { method: "HEAD" }),
+      env,
+      ctx,
+    );
+    assert.equal(headRes.status, 200);
+    assert.equal(await headRes.text(), "", "HEAD carries no body");
+    assert.equal(
+      queries.length,
+      queriesAfterGet,
+      "HEAD cache hit must not re-run the D1 aggregation",
+    );
+    assert.equal(cache.putKeys.length, 1, "HEAD hit must not re-put");
+  });
+
   test("INVARIANT: a different window and a different netuid key separately", async () => {
     originalCaches = globalThis.caches;
     const cache = mockCaches();

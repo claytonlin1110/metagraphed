@@ -456,44 +456,54 @@ export async function handleBulkHealthTrends(
     );
   }
 
-  return withEdgeCache(request, ctx, env, "bulk-trends", async () => {
-    const meta = await readHealthMetaKv(env);
-    // #4832 gap-closure: METAGRAPH_HEALTH_SOURCE is a NEW flag (unlike every
-    // other tier's tryPostgresTier wiring this session, which reused an
-    // already-flipped flag on an already-backfilled table) -- surface_checks/
-    // surface_uptime_daily only started accumulating from the dual-write
-    // landing (#4881/#4885), with no historical backfill. Left unset in
-    // wrangler.jsonc deliberately: an empty/short Postgres window is still a
-    // valid 200 response, so tryPostgresTier's error-only fallback can't
-    // detect "technically fine but missing D1's history" the way it detects
-    // a hard failure. Flip only once Postgres has accumulated a real 30-day
-    // window.
-    let isFallback = false;
-    let data = await tryPostgresTier(env, request, "METAGRAPH_HEALTH_SOURCE");
-    if (!data) {
-      const result = await loadBulkHealthTrends(d1Runner(env), {
-        observedAt: meta?.last_run_at || null,
-      });
-      data = result.data;
-      isFallback = hasD1FallbackRows(result.rows);
-    }
-    const response = await envelopeResponse(
-      request,
-      {
-        data,
-        meta: {
-          artifact_path: "/metagraph/health/trends.json",
-          cache: "short",
-          contract_version: contractVersion(env),
-          generated_at: data.observed_at,
-          published_at: await publishedAt(env),
-          source: "live-cron-prober",
+  return withEdgeCache(
+    request,
+    ctx,
+    env,
+    "bulk-trends",
+    async (cacheRequest) => {
+      const meta = await readHealthMetaKv(env);
+      // #4832 gap-closure: METAGRAPH_HEALTH_SOURCE is a NEW flag (unlike every
+      // other tier's tryPostgresTier wiring this session, which reused an
+      // already-flipped flag on an already-backfilled table) -- surface_checks/
+      // surface_uptime_daily only started accumulating from the dual-write
+      // landing (#4881/#4885), with no historical backfill. Left unset in
+      // wrangler.jsonc deliberately: an empty/short Postgres window is still a
+      // valid 200 response, so tryPostgresTier's error-only fallback can't
+      // detect "technically fine but missing D1's history" the way it detects
+      // a hard failure. Flip only once Postgres has accumulated a real 30-day
+      // window.
+      let isFallback = false;
+      let data = await tryPostgresTier(
+        env,
+        cacheRequest,
+        "METAGRAPH_HEALTH_SOURCE",
+      );
+      if (!data) {
+        const result = await loadBulkHealthTrends(d1Runner(env), {
+          observedAt: meta?.last_run_at || null,
+        });
+        data = result.data;
+        isFallback = hasD1FallbackRows(result.rows);
+      }
+      const response = await envelopeResponse(
+        cacheRequest,
+        {
+          data,
+          meta: {
+            artifact_path: "/metagraph/health/trends.json",
+            cache: "short",
+            contract_version: contractVersion(env),
+            generated_at: data.observed_at,
+            published_at: await publishedAt(env),
+            source: "live-cron-prober",
+          },
         },
-      },
-      "short",
-    );
-    return isFallback ? markD1FallbackResponse(response) : response;
-  });
+        "short",
+      );
+      return isFallback ? markD1FallbackResponse(response) : response;
+    },
+  );
 }
 
 // D1-backed 7d/30d uptime + latency trends for one subnet's operational
@@ -507,12 +517,16 @@ export async function handleHealthTrends(request, env, netuid, url, ctx = {}) {
   // route takes no params and returns all configured windows.
   const validationError = validateQueryParams(url, []);
   if (validationError) return analyticsQueryError(validationError);
-  return withEdgeCache(request, ctx, env, "trends", async () => {
+  return withEdgeCache(request, ctx, env, "trends", async (cacheRequest) => {
     // See handleBulkHealthTrends' own comment: METAGRAPH_HEALTH_SOURCE is a
     // new, deliberately-unflipped flag pending Postgres accumulating a real
     // history window.
     let usedFallback = false;
-    let data = await tryPostgresTier(env, request, "METAGRAPH_HEALTH_SOURCE");
+    let data = await tryPostgresTier(
+      env,
+      cacheRequest,
+      "METAGRAPH_HEALTH_SOURCE",
+    );
     if (!data) {
       // Read through the shared d1All (rather than handing the loader the bare
       // db) so a failure is still logged + marked as a D1 fallback (the
@@ -530,7 +544,7 @@ export async function handleHealthTrends(request, env, netuid, url, ctx = {}) {
       });
     }
     const response = await envelopeResponse(
-      request,
+      cacheRequest,
       {
         data,
         meta: {
@@ -565,10 +579,14 @@ export async function handleHealthPercentiles(
     ctx,
     env,
     "percentiles",
-    async () => {
+    async (cacheRequest) => {
       // See handleBulkHealthTrends' own comment on METAGRAPH_HEALTH_SOURCE.
       let usedFallback = false;
-      let data = await tryPostgresTier(env, request, "METAGRAPH_HEALTH_SOURCE");
+      let data = await tryPostgresTier(
+        env,
+        cacheRequest,
+        "METAGRAPH_HEALTH_SOURCE",
+      );
       if (!data) {
         // Wrap d1All so a failure is still logged + marked as a D1 fallback
         // (the dark-serve contract), since the formatted result no longer
@@ -586,7 +604,7 @@ export async function handleHealthPercentiles(
         });
       }
       const response = await envelopeResponse(
-        request,
+        cacheRequest,
         {
           data,
           meta: await analyticsMeta(
@@ -618,10 +636,14 @@ export async function handleHealthIncidents(
     ctx,
     env,
     "incidents",
-    async () => {
+    async (cacheRequest) => {
       // See handleBulkHealthTrends' own comment on METAGRAPH_HEALTH_SOURCE.
       let usedFallback = false;
-      let data = await tryPostgresTier(env, request, "METAGRAPH_HEALTH_SOURCE");
+      let data = await tryPostgresTier(
+        env,
+        cacheRequest,
+        "METAGRAPH_HEALTH_SOURCE",
+      );
       if (!data) {
         // Wrap d1All so a failure in either read is still logged + marked
         // as a D1 fallback (the dark-serve contract), since the formatted
@@ -639,7 +661,7 @@ export async function handleHealthIncidents(
         });
       }
       const response = await envelopeResponse(
-        request,
+        cacheRequest,
         {
           data,
           meta: await analyticsMeta(
@@ -918,7 +940,7 @@ export async function handleChainActivity(request, env, url, ctx = {}) {
     ctx,
     env,
     "chain-activity",
-    async () => {
+    async (cacheRequest) => {
       const meta = await readHealthMetaKv(env);
       // A Postgres hit is never a fallback (the rows never touched
       // hasD1FallbackRows' WeakSets, which only track D1's own degraded-
@@ -926,7 +948,7 @@ export async function handleChainActivity(request, env, url, ctx = {}) {
       let isFallback = false;
       let data = await tryPostgresTier(
         env,
-        request,
+        cacheRequest,
         "METAGRAPH_EXTRINSICS_SOURCE",
       );
       if (!data) {
@@ -942,13 +964,13 @@ export async function handleChainActivity(request, env, url, ctx = {}) {
           data.days,
           "chain-activity",
           "short",
-          request,
+          cacheRequest,
           CHAIN_ACTIVITY_CSV_COLUMNS,
         );
         return isFallback ? markD1FallbackResponse(csvRes) : csvRes;
       }
       const response = await envelopeResponse(
-        request,
+        cacheRequest,
         {
           data,
           meta: await analyticsMeta(
@@ -1002,12 +1024,12 @@ export async function handleChainCalls(request, env, url, ctx = {}) {
     ctx,
     env,
     "chain-calls",
-    async () => {
+    async (cacheRequest) => {
       let usedFallback = false;
       const meta = await readHealthMetaKv(env);
       let data = await tryPostgresTier(
         env,
-        request,
+        cacheRequest,
         "METAGRAPH_EXTRINSICS_SOURCE",
       );
       if (!data) {
@@ -1029,7 +1051,7 @@ export async function handleChainCalls(request, env, url, ctx = {}) {
           data.calls,
           "chain-calls",
           "short",
-          request,
+          cacheRequest,
           groupBy === "module_function"
             ? CHAIN_CALLS_FUNCTION_CSV_COLUMNS
             : CHAIN_CALLS_CSV_COLUMNS,
@@ -1037,7 +1059,7 @@ export async function handleChainCalls(request, env, url, ctx = {}) {
         return usedFallback ? markD1FallbackResponse(csvRes) : csvRes;
       }
       const response = await envelopeResponse(
-        request,
+        cacheRequest,
         {
           data,
           meta: await analyticsMeta(
@@ -1085,12 +1107,12 @@ export async function handleChainSigners(request, env, url, ctx = {}) {
     ctx,
     env,
     "chain-signers",
-    async () => {
+    async (cacheRequest) => {
       const meta = await readHealthMetaKv(env);
       let isFallback = false;
       let data = await tryPostgresTier(
         env,
-        request,
+        cacheRequest,
         "METAGRAPH_EXTRINSICS_SOURCE",
       );
       if (!data) {
@@ -1110,13 +1132,13 @@ export async function handleChainSigners(request, env, url, ctx = {}) {
           data.signers,
           "chain-signers",
           "short",
-          request,
+          cacheRequest,
           CHAIN_SIGNERS_CSV_COLUMNS,
         );
         return isFallback ? markD1FallbackResponse(csvRes) : csvRes;
       }
       const response = await envelopeResponse(
-        request,
+        cacheRequest,
         {
           data,
           meta: await analyticsMeta(
@@ -1994,16 +2016,16 @@ export async function handleChainFees(request, env, url, ctx = {}) {
     ctx,
     env,
     "chain-fees",
-    async () => {
+    async (cacheRequest) => {
       const meta = await readHealthMetaKv(env);
       let isFallback = false;
       let data = null;
       if (env.METAGRAPH_EXTRINSICS_SOURCE === "postgres" && env.DATA_API) {
-        const limited = await dataRateLimitResponse(request, env);
+        const limited = await dataRateLimitResponse(cacheRequest, env);
         if (limited) return limited;
         data = await tryPostgresTier(
           env,
-          request,
+          cacheRequest,
           "METAGRAPH_EXTRINSICS_SOURCE",
         );
       }
@@ -2026,13 +2048,13 @@ export async function handleChainFees(request, env, url, ctx = {}) {
           data.daily,
           "chain-fees",
           "short",
-          request,
+          cacheRequest,
           CHAIN_FEES_CSV_COLUMNS,
         );
         return isFallback ? markD1FallbackResponse(csvRes) : csvRes;
       }
       const response = await envelopeResponse(
-        request,
+        cacheRequest,
         {
           data,
           meta: await analyticsMeta(
