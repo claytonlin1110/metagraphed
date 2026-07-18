@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, Boxes, FileText, Zap } from "lucide-react";
 import { AccountAddress } from "@/components/metagraphed/account-address";
 import { AppShell } from "@/components/metagraphed/app-shell";
 import { ApiSourceFooter } from "@/components/metagraphed/api-source-footer";
-import { EmptyState, PageHeading, Skeleton } from "@/components/metagraphed/states";
+import { EmptyState, PageHeading, Skeleton, StaleBanner } from "@/components/metagraphed/states";
 import { EndpointSnippet } from "@/components/metagraphed/endpoint-snippet";
 import {
   CopyableCode,
@@ -26,7 +26,7 @@ import {
   blockExtrinsicsQuery,
   blockQuery,
 } from "@/lib/metagraphed/queries";
-import { formatNumber } from "@/lib/metagraphed/format";
+import { formatNumber, isStaleFreshness } from "@/lib/metagraphed/format";
 import { buildUrl } from "@/lib/metagraphed/client";
 import { blockRefPathSegment, isValidBlockRef, shortHash } from "@/lib/metagraphed/blocks";
 import { extrinsicCall } from "@/lib/metagraphed/extrinsics";
@@ -105,7 +105,9 @@ function BlockDetail({ refValue }: { refValue: string }) {
 function ValidBlockDetail({ refValue }: { refValue: string }) {
   const navigate = useNavigate();
   const sourceRef = blockRefPathSegment(refValue);
-  const block = useSuspenseQuery(blockQuery(refValue)).data.data;
+  const blockResult = useSuspenseQuery(blockQuery(refValue)).data;
+  const block = blockResult.data;
+  const generatedAt = blockResult.meta?.generated_at ?? null;
   const extrinsicsQuery = useQuery(blockExtrinsicsQuery(refValue, { limit: 100 }));
   const eventsQuery = useQuery(blockEventsQuery(refValue, { limit: 100 }));
   const chainEventsQuery = useQuery(blockChainEventsQuery(refValue));
@@ -176,9 +178,18 @@ function ValidBlockDetail({ refValue }: { refValue: string }) {
           )
         }
         actions={
-          <ActionBar>
-            <ShareButton bare />
-          </ActionBar>
+          <>
+            <ActionBar>
+              <ShareButton bare />
+            </ActionBar>
+            {isStaleFreshness(generatedAt) ? (
+              <StaleBanner
+                compact
+                generatedAt={generatedAt}
+                refreshQueryKeys={[blockQuery(refValue).queryKey]}
+              />
+            ) : null}
+          </>
         }
         caption="explorer / v1"
       />

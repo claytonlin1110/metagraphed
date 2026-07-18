@@ -5,7 +5,7 @@ import { Boxes, Clock, FileText, Link2, UserCog } from "lucide-react";
 import { AccountAddress } from "@/components/metagraphed/account-address";
 import { AppShell } from "@/components/metagraphed/app-shell";
 import { ApiSourceFooter } from "@/components/metagraphed/api-source-footer";
-import { EmptyState, PageHeading, Skeleton } from "@/components/metagraphed/states";
+import { EmptyState, PageHeading, Skeleton, StaleBanner } from "@/components/metagraphed/states";
 import { EndpointSnippet } from "@/components/metagraphed/endpoint-snippet";
 import {
   CopyableCode,
@@ -19,7 +19,7 @@ import {
 } from "@jsonbored/ui-kit";
 import { QueryErrorBoundary } from "@/components/metagraphed/error-boundary";
 import { extrinsicQuery, extrinsicsQuery } from "@/lib/metagraphed/queries";
-import { formatNumber, formatTao } from "@/lib/metagraphed/format";
+import { formatNumber, formatTao, isStaleFreshness } from "@/lib/metagraphed/format";
 import { shortHash } from "@/lib/metagraphed/blocks";
 import { unwrapByteArray, decodeBytesField } from "@/lib/metagraphed/bytes";
 import { eventKindLabel } from "@/lib/metagraphed/event-kinds";
@@ -107,7 +107,9 @@ function ExtrinsicDetail({ hash }: { hash: string }) {
 
 function ValidExtrinsicDetail({ hash }: { hash: string }) {
   const sourceRef = extrinsicHashPathSegment(hash);
-  const extrinsic = useSuspenseQuery(extrinsicQuery(hash)).data.data;
+  const extrinsicResult = useSuspenseQuery(extrinsicQuery(hash)).data;
+  const extrinsic = extrinsicResult.data;
+  const generatedAt = extrinsicResult.meta?.generated_at ?? null;
   const callArgs = extrinsic?.call_args;
   const events = (extrinsic?.events ?? []).slice(0, 100);
   // #3423: the events/call-args lists are sliced to bound render cost on an
@@ -181,9 +183,18 @@ function ValidExtrinsicDetail({ hash }: { hash: string }) {
           </span>
         }
         actions={
-          <ActionBar>
-            <ShareButton bare />
-          </ActionBar>
+          <>
+            <ActionBar>
+              <ShareButton bare />
+            </ActionBar>
+            {isStaleFreshness(generatedAt) ? (
+              <StaleBanner
+                compact
+                generatedAt={generatedAt}
+                refreshQueryKeys={[extrinsicQuery(hash).queryKey]}
+              />
+            ) : null}
+          </>
         }
         caption="explorer / v1"
       />
