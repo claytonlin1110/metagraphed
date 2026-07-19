@@ -3810,6 +3810,17 @@ test("GET /api/v1/subnets/:netuid/stake-moves returns the single-row aggregate",
   const body = await res.json();
   expect(body.movements).toBe(4);
   expect(body.distinct_movers).toBe(3);
+  // #6877: the distinct-movers subquery groups by coldkey only (GROUP BY 1), so it
+  // must NOT also SELECT the ungrouped `observed_at` — Postgres 500s on a selected
+  // column that is neither grouped nor aggregated. `observed_at` is unused inside the
+  // subquery (the outer query computes its own MAX(observed_at)).
+  const movesSql = queryText();
+  expect(movesSql).not.toMatch(
+    /SELECT\s+coldkey\s*,\s*observed_at\s+FROM\s+account_events/i,
+  );
+  expect(movesSql).toMatch(
+    /SELECT\s+coldkey\s+AS\s+\w+\s+FROM\s+account_events/i,
+  );
 });
 
 test("GET /api/v1/subnets/:netuid/stake-moves with no aggregate row returns the zeroed card, not a throw", async () => {
@@ -3828,6 +3839,17 @@ test("GET /api/v1/subnets/:netuid/stake-transfers returns the single-row aggrega
   expect(res.status).toBe(200);
   const body = await res.json();
   expect(body.transfers).toBe(6);
+  expect(body.distinct_senders).toBe(2);
+  // #6877: identical grouped-subquery fix for the distinct-senders count — the
+  // `senders` subquery must SELECT only the grouped coldkey, never the ungrouped
+  // `observed_at` (same Postgres GROUP BY 500 as the sibling stake-moves route).
+  const transfersSql = queryText();
+  expect(transfersSql).not.toMatch(
+    /SELECT\s+coldkey\s*,\s*observed_at\s+FROM\s+account_events/i,
+  );
+  expect(transfersSql).toMatch(
+    /SELECT\s+coldkey\s+AS\s+\w+\s+FROM\s+account_events/i,
+  );
 });
 
 test("GET /api/v1/subnets/:netuid/stake-transfers with no aggregate row returns the zeroed card, not a throw", async () => {
