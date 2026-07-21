@@ -6950,10 +6950,9 @@ const rootValue = {
     } catch (err) {
       // optionalBlocksWindow only throws toolError invalid_params; map it
       // straight to BAD_USER_INPUT (same contract as MCP get_chain_activity).
-      throw new GraphQLError(
-        err?.message || "Argument `blocks` must be a positive integer.",
-        { extensions: { code: "BAD_USER_INPUT" } },
-      );
+      throw new GraphQLError(err.message, {
+        extensions: { code: "BAD_USER_INPUT" },
+      });
     }
     try {
       const data = await loadChainActivity(context, windowBlocks);
