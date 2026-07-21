@@ -602,10 +602,11 @@ import {
   buildBlockExtrinsics,
 } from "./extrinsics.mjs";
 import {
-  dataApiFetchJson,
   loadBlockChainEvents,
+  loadChainActivity,
   loadChainEventsFeed,
   loadExtrinsicChainEvents,
+  optionalBlocksWindow,
 } from "./data-api-mcp.mjs";
 import {
   aiEnabled,
@@ -689,7 +690,7 @@ const MCP_LATEST_PROTOCOL = MCP_PROTOCOL_VERSIONS[0];
 //   - change or remove a tool's I/O       → MAJOR
 //   - behavioral-only fix (no I/O change) → PATCH
 // Reported in serverInfo.version (initialize) + the generated server-card.json.
-export const MCP_SERVER_VERSION = "1.78.7";
+export const MCP_SERVER_VERSION = "1.78.8";
 // Price-impact thresholds for get_stake_action_preview's plan-shaped
 // `warnings`/`ok` advisory (#6894). There is no prior precedent for these in
 // this codebase, so they follow common AMM/DEX slippage conventions: ~1% is the
@@ -1296,21 +1297,9 @@ async function loadSubnetEconomics(ctx, netuid) {
 }
 
 // Chain-activity aggregate (pallet.method event distribution) over the most
-// recent N blocks, from the Postgres-backed all-events tier. That tier lives in
-// the dedicated data Worker (ADR 0013) so the postgres.js driver stays out of
-// this Worker's bundle; MCP handlers reach it through the DATA_API service
-// binding, the same binding the REST proxy uses for /api/v1/chain-events/stats.
-async function loadChainActivity(ctx, blocks) {
-  const data = await dataApiFetchJson(
-    ctx,
-    `/api/v1/chain-events/stats?blocks=${blocks}`,
-  );
-  return {
-    window_blocks: data?.window_blocks ?? blocks,
-    groups: data?.groups ?? 0,
-    activity: Array.isArray(data?.activity) ? data.activity : [],
-  };
-}
+// recent N blocks lives in src/data-api-mcp.mjs (exported loadChainActivity,
+// #7432) alongside its raw-feed sibling loadChainEventsFeed — same shared
+// DATA_API path, now reused by GraphQL's chain_events_stats field too.
 
 // One page of the raw recent chain-events feed (newest first) from the
 // Postgres-backed all-events tier via the DATA_API binding — the same path
@@ -1922,21 +1911,9 @@ function requireHotkey(args) {
 // parseCompareNetuidList/parseCompareNetuids are already shared for
 // compare_subnets/GET /api/v1/compare.
 
-// The optional `blocks` window for get_chain_activity: a missing value defaults
-// to 1000; a provided value must be a positive integer and is clamped to the
-// data Worker's 1-5000 bound so a stray large value is silently capped (the data
-// Worker clamps too, but capping here keeps the request URL honest).
-function optionalBlocksWindow(args) {
-  const value = args?.blocks;
-  if (value === undefined || value === null) return 1000;
-  if (!Number.isInteger(value) || value < 1) {
-    throw toolError(
-      "invalid_params",
-      "Argument `blocks` must be a positive integer.",
-    );
-  }
-  return Math.min(value, 5000);
-}
+// The optional `blocks` window for get_chain_activity lives in
+// src/data-api-mcp.mjs (exported optionalBlocksWindow, #7432) beside its
+// loadChainActivity loader — shared with GraphQL's chain_events_stats field.
 
 function clampLimit(value, fallback, max) {
   // A missing/blank/<1 limit falls back to the default — it must NOT clamp UP to

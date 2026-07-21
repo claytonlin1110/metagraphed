@@ -19,7 +19,14 @@ import { loadEvidenceList } from "./evidence-mcp.mjs";
 // #7171: GraphQL parity for GET /api/v1/chain-events (paginated Query feed),
 // reusing loadChainEventsFeed that MCP list_chain_events already calls.
 // Distinct from Subscription.chainEvents (live WebSocket firehose).
-import { loadChainEventsFeed } from "./data-api-mcp.mjs";
+// #7432: GraphQL parity for GET /api/v1/chain-events/stats (the aggregate
+// sibling), reusing loadChainActivity + optionalBlocksWindow that MCP's
+// get_chain_activity already calls — both relocated here from mcp-server.mjs.
+import {
+  loadChainActivity,
+  loadChainEventsFeed,
+  optionalBlocksWindow,
+} from "./data-api-mcp.mjs";
 // #6992: GraphQL parity for profiles, reusing list_profiles' own loader
 // unchanged (same artifact read, filter, sort, and page logic REST and MCP
 // already use) -- not a reimplementation.
@@ -53,6 +60,9 @@ import { loadAdapter } from "./adapters-mcp.mjs";
 // already call -- not a reimplementation.
 import { loadChangelog } from "./changelog-mcp.mjs";
 import { loadContracts } from "./contracts-mcp.mjs";
+// #7431: GraphQL parity for GET /api/v1/build, reusing loadBuildSummary that
+// MCP get_build already calls -- not a reimplementation.
+import { loadBuildSummary } from "./build-mcp.mjs";
 import { loadHealthHistory } from "./health-history-mcp.mjs";
 import {
   buildChainAxonRemovals,
@@ -624,6 +634,8 @@ export const SDL = `
     changelog: Changelog
     "The registry's public artifact contract metadata: every baked artifact path, storage tier, schema reference, and consumer notes. Resolves to a GraphQL error (not null) when the contracts artifact has not been baked in this environment, matching the REST route's 404 and the get_contracts MCP tool. Mirrors GET /api/v1/contracts."
     contracts: Contracts
+    "The generated build summary: artifact inventory counts and sizes, subnet/provider/surface totals, coverage rollup, and publish metadata. Resolves to a GraphQL error (not null) when the build-summary artifact has not been baked in this environment, matching the REST route's 404 and the get_build MCP tool. Mirrors GET /api/v1/build."
+    build: BuildSummary!
     "A compact daily operational health snapshot for one UTC date (YYYY-MM-DD): per-surface status/latency plus summary incident counts from the archived health/history tier. Filter by netuid/kind/provider/status/classification, sort with sort/order, and page with limit (1-1000)/cursor. An invalid date/filter/sort/limit/cursor or a missing snapshot is a GraphQL error, not a silently substituted default. Distinct from the live health rollup and health_trends. Mirrors GET /api/v1/health/history/{date}."
     health_history(date: String!, netuid: Int, kind: String, provider: String, status: String, classification: String, sort: String, order: String, fields: String, limit: Int, cursor: Int): HealthHistory!
     "Global operational health rollup with per-subnet summaries."
@@ -638,6 +650,8 @@ export const SDL = `
     extrinsics(limit: Int, offset: Int, cursor: String, block: Int, signer: String, call_module: String, call_function: String, success: Boolean): ExtrinsicList!
     "Paginated all-events feed (newest first) from the Postgres-backed all-events tier: each event's block, event index, pallet, method, decoded args, phase, and emitting extrinsic index. Filter by pallet/method/block/extrinsic; page with limit (1-200, default 50) and the opaque keyset cursor (or legacy before=block_number). An invalid filter combo is a GraphQL BAD_USER_INPUT error; a cold/unbound tier resolves to a schema-stable empty feed, never a GraphQL error. Distinct from Subscription.chainEvents (live WebSocket firehose). Mirrors GET /api/v1/chain-events."
     chain_events(pallet: String, method: String, block: Int, extrinsic: Int, cursor: String, before: Int, limit: Int): ChainEventsFeed!
+    "Chain-activity aggregate over the most recent N blocks (the blocks arg, 1-5000, default 1000, a stray large value silently capped) from the Postgres-backed all-events tier: the pallet.method event distribution, each with its count, busiest first. A non-positive/non-integer blocks is a GraphQL BAD_USER_INPUT error; a cold/unbound tier resolves to a schema-stable empty aggregate, never a GraphQL error. The aggregate sibling of chain_events (the raw feed). Mirrors GET /api/v1/chain-events/stats (and MCP get_chain_activity)."
+    chain_events_stats(blocks: Int): ChainEventsStats!
     "One extrinsic by hash or composite block_number-extrinsic_index ref; extrinsic is null when the ref doesn't resolve (schema-stable, never a GraphQL error). Mirrors GET /api/v1/extrinsics/{ref}."
     extrinsic(ref: String!): ExtrinsicDetail
     "Subtensor's root-origin hyperparameter/network-config change feed (newest first) -- the extrinsics feed fixed to call_module=AdminUtils, so it takes no signer/call_module filter. Same ExtrinsicList shape as extrinsics. Mirrors GET /api/v1/governance/config-changes."
@@ -1969,6 +1983,20 @@ export const SDL = `
     observed_at: Float
   }
 
+  "Chain-activity aggregate (pallet.method event distribution) over the most recent N blocks from the Postgres-backed all-events tier. The aggregate sibling of ChainEventsFeed. Mirrors GET /api/v1/chain-events/stats (and MCP get_chain_activity)."
+  type ChainEventsStats {
+    window_blocks: Int!
+    groups: Int!
+    activity: [ChainEventsStatsRow!]!
+  }
+
+  "One pallet.method group in the chain-activity aggregate, with its event count over the window."
+  type ChainEventsStatsRow {
+    pallet: String
+    method: String
+    count: Int
+  }
+
   type ProfileList {
     captured_at: String
     profiles: [JSON!]!
@@ -2002,6 +2030,22 @@ export const SDL = `
     type_definitions_url: String
     notes: JSON
     artifacts: [JSON!]!
+  }
+
+  type BuildSummary {
+    schema_version: Int!
+    contract_version: String
+    generated_at: String
+    published_at: String
+    adapter_count: Int
+    artifact_count: Int!
+    artifact_size_bytes: Int
+    subnet_count: Int
+    surface_count: Int
+    provider_count: Int
+    artifacts: JSON
+    coverage: JSON
+    artifact_budget_summary: JSON
   }
 
   type HealthHistory {
@@ -4160,12 +4204,14 @@ export const FIELD_COMPLEXITY = {
   rpc_endpoints: RELATIONSHIP_FIELD_COMPLEXITY,
   changelog: RELATIONSHIP_FIELD_COMPLEXITY,
   contracts: RELATIONSHIP_FIELD_COMPLEXITY,
+  build: RELATIONSHIP_FIELD_COMPLEXITY,
   health_history: RELATIONSHIP_FIELD_COMPLEXITY,
   health: RELATIONSHIP_FIELD_COMPLEXITY,
   opportunity_boards: RELATIONSHIP_FIELD_COMPLEXITY,
   compare: RELATIONSHIP_FIELD_COMPLEXITY,
   extrinsics: RELATIONSHIP_FIELD_COMPLEXITY,
   chain_events: RELATIONSHIP_FIELD_COMPLEXITY,
+  chain_events_stats: RELATIONSHIP_FIELD_COMPLEXITY,
   sudo: RELATIONSHIP_FIELD_COMPLEXITY,
   extrinsic: RELATIONSHIP_FIELD_COMPLEXITY,
   governance_config_changes: RELATIONSHIP_FIELD_COMPLEXITY,
@@ -6199,6 +6245,13 @@ const rootValue = {
     return loadContracts(context, { readArtifact });
   },
 
+  // #7431: reuse get_build's own loader unchanged (the same baked artifact read
+  // REST and MCP already use). A cold/absent artifact makes the loader throw,
+  // which the graphql executor surfaces as a normal GraphQL error.
+  build(_args, context) {
+    return loadBuildSummary(context, { readArtifact });
+  },
+
   // #7170: reuse get_health_history's own loader unchanged. It takes deps as
   // { readArtifact } called (ctx, path) returning data-or-null -- this file's
   // own loadArtifact has exactly that shape, so it's reused directly (like
@@ -6880,6 +6933,32 @@ const rootValue = {
         next_cursor: null,
         events: [],
       };
+    }
+  },
+
+  // #7432: the aggregate sibling of chain_events. Reuses optionalBlocksWindow
+  // (the same 1000-default/positive-integer/1-5000-cap validation MCP's
+  // get_chain_activity applies) then loadChainActivity — both relocated to
+  // data-api-mcp.mjs beside loadChainEventsFeed.
+  async chain_events_stats({ blocks }, context) {
+    let window;
+    try {
+      window = optionalBlocksWindow({ blocks });
+    } catch (err) {
+      // optionalBlocksWindow's only failure is invalid_params (a non-positive
+      // or non-integer blocks) — surface it as BAD_USER_INPUT, mirroring how
+      // chain_events maps the sibling feed's invalid-filter error.
+      throw new GraphQLError(err.message, {
+        extensions: { code: "BAD_USER_INPUT" },
+      });
+    }
+    try {
+      return await loadChainActivity(context, window);
+    } catch {
+      // A cold/unbound/rate-limited tier degrades to a schema-stable empty
+      // aggregate (echoing the validated window), never a GraphQL error —
+      // matching chain_events' cold-empty convention.
+      return { window_blocks: window, groups: 0, activity: [] };
     }
   },
 
