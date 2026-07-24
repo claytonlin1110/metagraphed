@@ -45,6 +45,10 @@ import { loadEndpointIncidentsList } from "./endpoint-incidents-mcp.ts";
 // same loadProviderEndpointsList that MCP list_provider_endpoints already calls
 // (#3289) -- not a reimplementation.
 import { loadProviderEndpointsList } from "./provider-endpoints-mcp.ts";
+// #7888: GraphQL parity for GET /api/v1/providers list filters (id/kind/
+// authority/sort/order/fields + limit/cursor), reusing loadProvidersList that
+// MCP list_providers already calls -- not a reimplementation.
+import { loadProvidersList } from "./providers-mcp.ts";
 // #7167: GraphQL parity for the /api/v1/review/* contributor-review family,
 // reusing each list_* MCP loader unchanged (same artifact read, filter, sort,
 // and page logic REST and MCP already use) -- not a reimplementation.
@@ -596,8 +600,8 @@ export const SDL = `
     subnet_overview(netuid: Int!): JSON
     "One subnet's contributor-review profile: candidate surfaces, contract version, endpoints, and completeness/curation metadata. Null when no profile has been baked for that netuid (rather than a GraphQL error); a negative netuid is a BAD_USER_INPUT error. Opaque JSON passed through verbatim, matching the get_subnet_profile MCP/REST shape. Mirrors GET /api/v1/subnets/{netuid}/profile."
     subnet_profile(netuid: Int!): JSON
-    "Paginated provider/source registry."
-    providers(limit: Int, cursor: String): ProviderList!
+    "Paginated provider/source registry -- filter by id/kind/authority, sort with sort/order, project with fields, and page with limit (1-100)/cursor. An invalid filter/sort/limit/cursor is a GraphQL error, not a silently substituted default. Mirrors GET /api/v1/providers."
+    providers(id: String, kind: String, authority: String, sort: String, order: String, fields: String, limit: Int, cursor: Int): ProviderList!
     "One provider with its subnets."
     provider(id: String!): Provider
     "One adapter-backed public metrics snapshot by slug (e.g. 'gittensor', 'allways', 'sn-64'): the captured adapter snapshot, extension metadata, and netuid linkage. An invalid slug is a BAD_USER_INPUT error; a missing slug resolves to null (schema-stable, never a GraphQL error). Mirrors GET /api/v1/adapters/{slug}."
@@ -870,7 +874,8 @@ export const SDL = `
   type ProviderList {
     items: [Provider!]!
     total: Int!
-    next_cursor: String
+    "Opaque integer offset cursor from REST/MCP list-query pagination; null when there is no next page."
+    next_cursor: Int
   }
 
   type Provider {
@@ -6128,13 +6133,20 @@ const rootValue = {
     };
   },
 
-  providers({ limit, cursor }, context) {
-    return listPage(context, ARTIFACT.providers, "providers", {
-      limit,
-      cursor,
-      keyFn: (p) => p.id,
-      map: providerNode,
-    });
+  // #7888: reuse list_providers' own loader unchanged (same artifact read,
+  // filter, sort, and page logic REST and MCP already use) rather than the
+  // previous unfiltered listPage path. The loader validates its own args and
+  // throws on an invalid one -- that throw becomes a GraphQL error, matching
+  // endpoint_pools' "unsupported filter/sort is a GraphQL error, not a
+  // silently substituted default" convention. A cold/absent artifact is
+  // likewise a GraphQL error (matching REST/MCP not_found).
+  async providers(args, context) {
+    const data = await loadProvidersList(context, args, { readArtifact });
+    return {
+      items: (data.providers || []).map(providerNode),
+      total: data.total ?? 0,
+      next_cursor: data.next_cursor ?? null,
+    };
   },
 
   async provider({ id }, context) {
